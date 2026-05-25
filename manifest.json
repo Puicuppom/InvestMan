@@ -1,0 +1,16 @@
+{
+  "name": "ลงทุนแมน - วางแผนการเงิน",
+  "short_name": "ลงทุนแมน",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#F0F4F8",
+  "theme_color": "#005B96",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/3459/3459372.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
