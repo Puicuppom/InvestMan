@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ลงทุนแมน - วางแผนการเงินและคำนวณเกษียณ</title>
+    
+    <!-- === ส่วนที่เพิ่มสำหรับปักหมุด (PWA) === -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#005B96">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/12140/12140258.png">
+    <!-- =================================== -->
+    
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;700&display=swap');
+
+        :root {
+            --primary-color: #005B96; 
+            --secondary-color: #6497B1;
+            --background-color: #F0F4F8;
+            --card-bg-color: #FFFFFF;
+            --text-color-dark: #212529;
+            --text-color-light: #F8F9FA;
+            --danger-color: #D9534F; 
+            --success-color: #5CB85C;
+            --border-color: #DEE2E6;
+            --primary-hover-color: #004a7a;
+            --danger-hover-color: #c9302c;
+            --secondary-hover-color: #507a8f;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Kanit', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color-dark);
+            padding: 2rem 0;
+        }
+        
+        .container { 
+            max-width: 960px;
+            margin: auto; 
+            padding: 15px; 
+        }
+        .hidden { display: none !important; }
+
+        /* --- Button Base Styles --- */
+        button {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            font-family: 'Kanit', sans-serif;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        button.btn-primary { background-color: var(--primary-color); color: white; }
+        button.btn-primary:hover { background-color: var(--primary-hover-color); }
+        button.btn-danger { background-color: var(--danger-color); color: white; }
+        button.btn-danger:hover { background-color: var(--danger-hover-color); }
+        button.btn-secondary { background-color: var(--secondary-color); color: white; }
+        button.btn-secondary:hover { background-color: var(--secondary-hover-color); }
+        button.btn-light { background-color: #eef2ff; color: var(--primary-color); border: 1px solid var(--primary-color); }
+        button.btn-light:hover { background-color: #e0e7ff; }
+
+        /* --- Main App Styling --- */
+        header { 
+            text-align: center; margin-bottom: 30px; background: var(--primary-color);
+            padding: 25px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            color: var(--text-color-light);
+        }
+        header h1 { font-weight: 700; font-size: 2.5rem; margin-bottom: 8px; }
+        header p#user-email-display { font-size: 1rem; word-break: break-all; opacity: 0.9; }
+        #logout-btn { 
+             margin-top: 15px; padding: 10px 25px;
+        }
+
+        .section {
+            background: var(--card-bg-color); padding: 25px; border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-bottom: 25px;
+            border: 1px solid var(--border-color);
+        }
+        .section-title {
+            text-align: center; margin-bottom: 25px; color: var(--primary-color);
+            font-weight: 600; font-size: 1.75rem;
+        }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label {
+            display: block; margin-bottom: 8px; font-weight: 500; color: #495057;
+        }
+        .form-group input, .form-group select {
+            width: 100%; padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 5px;
+            font-family: inherit; font-size: 1rem; transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .form-group input:focus, .form-group select:focus {
+            outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(0, 91, 150, 0.1);
+        }
+        #investment-form button[type="submit"] { width: 100%; }
+        
+        .dashboard { 
+            display: grid; grid-template-columns: repeat(3, 1fr);
+            gap: 20px; margin-bottom: 25px;
+        }
+        .card {
+            background: var(--card-bg-color); padding: 20px; border-radius: 8px;
+            border: 1px solid var(--border-color); text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        .card h3 { font-size: 1rem; color: #6C757D; font-weight: 500; margin-bottom: 12px; }
+        .card .amount { font-size: 1.8rem; font-weight: 700; color: var(--text-color-dark); word-break: break-all; }
+        .card .sub-amount { font-size: 1rem; font-weight: 500; display: block; margin-top: 4px; }
+        
+        .positive { color: var(--success-color) !important; font-weight: bold; }
+        .negative { color: var(--danger-color) !important; font-weight: bold; }
+
+        .view-toggle { 
+            display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 25px; 
+            border-radius: 8px; overflow: hidden; border: 1px solid var(--primary-color);
+        }
+        .view-toggle-btn { 
+            padding: 12px; background: var(--card-bg-color); border: none; cursor: pointer; 
+            font-family: 'Kanit', sans-serif; font-size: 1rem; color: var(--primary-color);
+            font-weight: 500; transition: all 0.2s ease;
+            border-radius: 0; box-shadow: none;
+        }
+        .view-toggle-btn.active { background-color: var(--primary-color); color: white; font-weight: 600; }
+        
+        .table-container {
+            width: 100%;
+            overflow-x: auto;
+        }
+
+        table { font-size: 0.9rem; width: 100%; border-collapse: collapse; }
+        th, td { white-space: nowrap; padding: 12px 10px; text-align: right;}
+        th:first-child, td:first-child { text-align: left;}
+        th { text-align: center; }
+        th:first-child { text-align: left; }
+
+        .btn-small { padding: 6px 12px; font-size: 0.8rem; width: auto; display: inline-block; }
+        .btn-small-danger { padding: 4px 8px; font-size: 0.8rem; width: auto; display: inline-block; background-color: var(--danger-color); color: white;}
+        .btn-small-danger:hover { background-color: var(--danger-hover-color); }
+        .btn-small-secondary { padding: 4px 8px; font-size: 0.8rem; width: auto; display: inline-block; background-color: var(--secondary-color); color: white;}
+        .btn-small-secondary:hover { background-color: var(--secondary-hover-color); }
+        .btn-mobile-only { display: none; }
+        
+        /* Summary Accordion Styles */
+        #summary-table .summary-row { cursor: pointer; transition: background-color 0.2s ease; }
+        #summary-table .summary-row:hover { background-color: #f5f8fa; }
+        #summary-table .details-row td { padding: 0; }
+        #summary-table .details-content { padding: 15px; background-color: #fafcff; }
+        #summary-table .investment-item {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 10px; border-bottom: 1px solid #e9ecef;
+        }
+        #summary-table .investment-item:last-child { border-bottom: none; }
+        .investment-item-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .investment-item-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+
+        .modal-container { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 100; display: flex; justify-content: center; align-items: center; padding: 15px; overflow-y: auto; }
+        .modal-content { background: var(--card-bg-color); padding: 30px; border-radius: 8px; width: 100%; max-width: 500px; }
+        .modal-content .form-info { font-size: 0.9rem; color: #6c757d; }
+        .modal-content .button-group { display: flex; gap: 15px; margin-top: 25px; }
+        .modal-content .button-group button { flex: 1; }
+        
+        /* Filter Styles */
+        .filter-container {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 25px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+        }
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+        }
+        .filter-group label {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+        .filter-group select {
+            padding: 8px 12px;
+            border-radius: 5px;
+            border: 1px solid var(--border-color);
+            min-width: 150px;
+            font-family: 'Kanit', sans-serif;
+            font-size: 1rem;
+        }
+        
+        /* Retirement Calculator Specific Styles */
+        #retirement-view h1 { text-align: center; color: var(--primary-color); margin-bottom: 25px; }
+        #retirement-view label { display: block; margin-bottom: 8px; font-weight: bold; color: #4b5563; }
+        #retirement-view input {
+            width: 100%; padding: 12px; border: 1px solid #d1d5db; border-radius: 8px;
+            box-sizing: border-box; font-size: 1rem;
+        }
+        #retirement-view .format-number { text-align: right; }
+        #retirement-view .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
+        #retirement-view button { font-size: 1.1rem; }
+        #retirement-view .results {
+            margin-top: 30px; padding: 20px; background-color: #eef2ff;
+            border: 2px solid #c7d2fe; border-radius: 8px;
+        }
+        #retirement-view .results h2 { margin-top: 0; color: var(--primary-color); text-align: center; }
+        #retirement-view .results p { font-size: 1.1rem; line-height: 1.6; margin: 10px 0; }
+        #retirement-view .results span { font-weight: bold; color: #1d4ed8; }
+        #retirement-view .error { color: var(--danger-color); text-align: center; margin-top: 15px; min-height: 1.2em; }
+        
+        /* --- MOBILE RESPONSIVE STYLES --- */
+        @media (max-width: 768px) {
+            body { padding: 1rem 0; }
+            .container { padding: 8px; }
+            .section { padding: 15px; }
+            header h1 { font-size: 2rem; }
+            
+            .dashboard {
+                gap: 8px;
+            }
+            .card { padding: 10px; }
+            .card h3 {
+                font-size: 0.75rem;
+                margin-bottom: 6px;
+                word-break: keep-all;
+            }
+            .card .amount { font-size: 1.0rem; }
+            .card .sub-amount { font-size: 0.7rem; }
+            
+            .filter-container {
+                flex-direction: row;
+                gap: 10px;
+            }
+            .filter-group {
+                flex: 1;
+            }
+            .filter-group select {
+                width: 100%;
+                min-width: 0;
+            }
+
+            #summary-table .investment-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .investment-item-actions {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            table thead { display: none; }
+            table tr {
+                display: block; margin-bottom: 1rem; border-radius: 8px;
+                border: 1px solid var(--border-color); box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+                overflow: hidden;
+            }
+            table td {
+                display: flex; justify-content: space-between; align-items: center;
+                padding: 10px 15px; text-align: right !important; border-bottom: 1px solid #f0f0f0;
+                white-space: normal;
+            }
+             table td:last-child { border-bottom: none; }
+            table td::before {
+                content: attr(data-label); font-weight: 500; color: #333;
+                text-align: left; margin-right: 15px;
+            }
+
+            #summary-table .details-content {
+                flex-direction: column;
+                align-items: stretch; 
+            }
+            
+            .desktop-only-cell { display: none; }
+            #summary-table td:first-child { 
+                background-color: var(--primary-color); color: white; font-weight: bold;
+                font-size: 1.1rem; padding: 12px 15px;
+                display: flex; justify-content: space-between; align-items: center;
+            }
+            #summary-table td:first-child .btn-mobile-only {
+                display: inline-block;
+                background-color: var(--secondary-color);
+                color: white;
+                padding: 4px 10px;
+                font-size: 0.8rem;
+                font-weight: 500;
+            }
+            #summary-table td:first-child::before { display: none; }
+            #yearly-summary-table td:last-child { justify-content: center; }
+            #summary-table .details-row {
+                margin-top: -1rem; margin-bottom: 1rem; border-top: none;
+                border-top-left-radius: 0; border-top-right-radius: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- AUTH CONTAINER -->
+        <div id="auth-container">
+            <div class="section">
+                <h2 class="section-title">เข้าสู่ระบบ</h2>
+                <form id="login-form">
+                    <div class="form-group"><label for="login-email">อีเมล</label><input type="email" id="login-email" required></div>
+                    <div class="form-group"><label for="login-password">รหัสผ่าน</label><input type="password" id="login-password" required></div>
+                    <button type="submit" class="btn-primary" style="width: 100%;">เข้าสู่ระบบ</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- MAIN APP CONTAINER -->
+        <div id="app-container" class="hidden">
+            <header>
+                <h1>ลงทุนแมน</h1>
+                <p id="user-email-display"></p>
+                <button id="logout-btn" class="btn-danger">ออกจากระบบ</button>
+            </header>
+            
+            <div class="dashboard">
+                <div class="card"><h3>เงินลงทุนรวม</h3><p class="amount" id="total-investment">฿0.00</p></div>
+                <div class="card"><h3>มูลค่าปัจจุบันรวม</h3><p class="amount" id="current-value">฿0.00</p></div>
+                <div class="card"><h3>กำไร/ขาดทุน</h3><p class="amount" id="profit-loss">฿0.00</p></div>
+            </div>
+
+            <div class="view-toggle">
+                <button class="view-toggle-btn active" onclick="setView('summary')">สรุปตามประเภท</button>
+                <button class="view-toggle-btn" onclick="setView('analysis')">วิเคราะห์รายปี</button>
+                <button class="view-toggle-btn" onclick="setView('retirement')">คำนวณเกษียณ</button>
+            </div>
+
+            <div id="summary-view">
+                 <div class="section">
+                    <h2 class="section-title">สรุปตามประเภทสินทรัพย์</h2>
+                    <div class="filter-container">
+                        <div class="filter-group">
+                            <label for="filter-month">เลือกเดือน</label>
+                            <select id="filter-month"></select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filter-year">เลือกปี (พ.ศ.)</label>
+                            <select id="filter-year"></select>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="summary-table"></table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="analysis-view" class="hidden">
+                <div class="section">
+                    <h2 class="section-title">สรุปผลการดำเนินงานรายปี</h2>
+                    <div class="table-container">
+                        <table id="yearly-summary-table"></table>
+                    </div>
+                </div>
+            </div>
+
+            <div id="retirement-view" class="hidden">
+                <div class="section">
+                    <h1>คำนวณเงินเกษียณ</h1>
+                    <form id="retirement-form">
+                        <div class="form-group">
+                            <label for="initialInvestment">เงินลงทุนตั้งต้น (บาท)</label>
+                            <input type="text" id="initialInvestment" class="format-number" inputmode="numeric" placeholder="ข้อมูลจากพอร์ตปัจจุบัน" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="monthlyInvestment">เงินลงทุนต่อเดือน (บาท)</label>
+                            <input type="text" id="monthlyInvestment" class="format-number" inputmode="numeric" placeholder="เช่น 5,000" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="annualReturn">ผลตอบแทนที่คาดหวังต่อปี (%)</label>
+                            <input type="number" id="annualReturn" placeholder="เช่น 8" step="0.1" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="birthDate">วัน/เดือน/ปีเกิด</label>
+                            <input type="date" id="birthDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="retirementAge">อายุที่ต้องการเกษียณ (ปี)</label>
+                            <input type="number" id="retirementAge" placeholder="เช่น 60" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="lifeExpectancy">อายุที่คาดว่าจะเสียชีวิต (ปี)</label>
+                            <input type="number" id="lifeExpectancy" placeholder="เช่น 85" required>
+                        </div>
+                        <div class="button-group">
+                            <button type="button" id="resetButton" class="btn-light">ล้างข้อมูล</button>
+                            <button type="submit" class="btn-primary">คำนวณ</button>
+                        </div>
+                        <p id="error-message" class="error"></p>
+                    </form>
+                    <div id="results" class="results hidden">
+                        <h2>สรุปผลการคำนวณ</h2>
+                        <p>คุณจะลงทุนเป็นเวลา <span id="yearsToInvest"></span> ปี</p>
+                        <p>เงินที่จะมี ณ วันเกษียณอายุ <span id="ageAtRetirement"></span> ปี: <span id="retirementTotal"></span></p>
+                        <hr>
+                        <p>คุณจะมีเงินใช้หลังเกษียณไปอีก <span id="yearsInRetirement"></span> ปี</p>
+                        <p>เงินที่ใช้ได้ต่อเดือนจนถึงอายุ <span id="ageAtEnd"></span> ปี: <span id="monthlyWithdrawal"></span></p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section" id="add-investment-section">
+                <h2 class="section-title">เพิ่มรายการลงทุน</h2>
+                <form id="investment-form">
+                    <div class="form-group"><label for="asset_type">ประเภทสินทรัพย์</label>
+                        <select id="asset_type">
+                            <option value="หุ้นไทย">หุ้นไทย</option><option value="หุ้นต่างประเทศ">หุ้นต่างประเทศ</option>
+                            <option value="กองทุนรวม">กองทุนรวม</option><option value="คริปโตเคอร์เรนซี">คริปโตเคอร์เรนซี</option>
+                            <option value="อสังหาริมทรัพย์">อสังหาริมทรัพย์</option><option value="อื่นๆ">อื่นๆ</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="asset_name">ชื่อสินทรัพย์ (เช่น PTT, B-INNOTECH)</label>
+                        <input type="text" id="asset_name" list="asset-names-list" required>
+                        <datalist id="asset-names-list"></datalist>
+                    </div>
+                    <div class="form-group"><label for="amount">จำนวนเงินลงทุน</label><input type="number" step="0.01" id="amount" required></div>
+                    <div class="form-group"><label for="investment_date">วันที่ลงทุน</label><input type="date" id="investment_date" required></div>
+                    <button type="submit" class="btn-primary">เพิ่มรายการ</button>
+                </form>
+            </div>
+             
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <div id="update-value-modal-container" class="modal-container hidden">
+        <div class="modal-content">
+            <h2 class="section-title" id="update-value-title">อัปเดตมูลค่ารวม</h2>
+            <form id="update-value-form">
+                <input type="hidden" id="update-asset-type">
+                <div class="form-group"><label>เงินลงทุนรวม (ตั้งต้น)</label><input type="text" id="update-total-investment" readonly style="background-color: #e9ecef;"></div>
+                <div class="form-group"><label>มูลค่าปัจจุบันรวม (เดิม)</label><input type="text" id="update-current-total-value" readonly style="background-color: #e9ecef;"></div>
+                <div class="form-group">
+                    <label for="new-total-value">มูลค่าปัจจุบันรวม (ใหม่)</label><input type="number" step="0.01" id="new-total-value" required>
+                    <p class="form-info">ระบบจะกระจายมูลค่าใหม่นี้ไปยังทุกรายการตามสัดส่วนเงินลงทุน</p>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn-light" onclick="document.getElementById('update-value-modal-container').classList.add('hidden')">ยกเลิก</button>
+                    <button type="submit" class="btn-primary">บันทึกการเปลี่ยนแปลง</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="edit-investment-modal-container" class="modal-container hidden">
+        <div class="modal-content">
+            <h2 class="section-title">แก้ไขรายการลงทุน</h2>
+            <form id="edit-investment-form">
+                <input type="hidden" id="edit-investment-id">
+                <div class="form-group"><label for="edit-asset-type">ประเภทสินทรัพย์</label>
+                    <select id="edit-asset-type">
+                        <option value="หุ้นไทย">หุ้นไทย</option><option value="หุ้นต่างประเทศ">หุ้นต่างประเทศ</option>
+                        <option value="กองทุนรวม">กองทุนรวม</option><option value="คริปโตเคอร์เรนซี">คริปโตเคอร์เรนซี</option>
+                        <option value="อสังหาริมทรัพย์">อสังหาริมทรัพย์</option><option value="อื่นๆ">อื่นๆ</option>
+                    </select>
+                </div>
+                <div class="form-group"><label for="edit-asset-name">ชื่อสินทรัพย์</label><input type="text" id="edit-asset-name" required></div>
+                <div class="form-group"><label for="edit-amount">จำนวนเงินลงทุน</label><input type="number" step="0.01" id="edit-amount" required></div>
+                <div class="form-group"><label for="edit-current-value">มูลค่าปัจจุบัน</label><input type="number" step="0.01" id="edit-current-value" required></div>
+                <div class="form-group"><label for="edit-investment-date">วันที่ลงทุน</label><input type="date" id="edit-investment-date" required></div>
+                <div class="button-group">
+                    <button type="button" class="btn-light" onclick="document.getElementById('edit-investment-modal-container').classList.add('hidden')">ยกเลิก</button>
+                    <button type="submit" class="btn-primary">บันทึก</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    <script>
+    const SUPABASE_URL = "https://fmbympgecspgqtnazrbm.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtYnltcGdlY3NwZ3F0bmF6cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3NDkwOTksImV4cCI6MjA2NjMyNTA5OX0.rqOrNDNRTF7WnDS6utTTKfFoNZKPiMZV_ttqYzYCaJs";
+    const { createClient } = supabase;
+    const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // --- GLOBAL VARIABLES ---
+    let allInvestments = [];
+    let yearlySnapshots = [];
+    let currentView = 'summary';
+
+    // === ส่วนที่เพิ่มสำหรับปักหมุด (Service Worker) ===
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('SW Registered'))
+                .catch(err => console.log('SW Registration Failed', err));
+        });
+    }
+    // ==========================================
+
+    window.saveSnapshot = async (year, totalInvest) => {
+        const value = prompt(`ระบุมูลค่าพอร์ตสุทธิ ณ สิ้นปี พ.ศ. ${year + 543}:`);
+        if (value === null || isNaN(parseFloat(value))) return;
+
+        try {
+            const { data: { user } } = await db.auth.getUser();
+            const { error } = await db.from('yearly_snapshots').upsert({
+                user_id: user.id,
+                year: year,
+                portfolio_value: parseFloat(value),
+                total_investment: totalInvest
+            });
+
+            if (error) throw error;
+            alert('บันทึกข้อมูลเรียบร้อยแล้ว');
+            await fetchAllInvestments(); 
+        } catch (error) {
+            alert('เกิดข้อผิดพลาด: ' + error.message);
+        }
+    };
+
+    const authContainer = document.getElementById('auth-container');
+    const appContainer = document.getElementById('app-container');
+    const userEmailDisplay = document.getElementById('user-email-display');
+    const summaryView = document.getElementById('summary-view');
+    const analysisView = document.getElementById('analysis-view');
+    const retirementView = document.getElementById('retirement-view');
+    const addInvestmentSection = document.getElementById('add-investment-section');
+    const investmentDateEl = document.getElementById('investment_date');
+    const updateValueModalContainer = document.getElementById('update-value-modal-container');
+    const editInvestmentModalContainer = document.getElementById('edit-investment-modal-container');
+    const retirementForm = document.getElementById('retirement-form');
+    const retirementInitialInvestmentEl = document.getElementById('initialInvestment');
+    const retirementMonthlyInvestmentEl = document.getElementById('monthlyInvestment');
+    const retirementAnnualReturnEl = document.getElementById('annualReturn');
+    const retirementBirthDateEl = document.getElementById('birthDate');
+    const retirementAgeEl = document.getElementById('retirementAge');
+    const retirementLifeExpectancyEl = document.getElementById('lifeExpectancy');
+    const retirementResetButton = document.getElementById('resetButton');
+    const retirementResultsDiv = document.getElementById('results');
+    const retirementYearsToInvestSpan = document.getElementById('yearsToInvest');
+    const retirementAgeAtRetirementSpan = document.getElementById('ageAtRetirement');
+    const retirementTotalSpan = document.getElementById('retirementTotal');
+    const retirementYearsInRetirementSpan = document.getElementById('yearsInRetirement');
+    const retirementAgeAtEndSpan = document.getElementById('ageAtEnd');
+    const retirementMonthlyWithdrawalSpan = document.getElementById('monthlyWithdrawal');
+    const retirementErrorMessage = document.getElementById('error-message');
+    const RETIREMENT_STORAGE_KEY = 'retirementCalculatorData';
+    const filterMonthEl = document.getElementById('filter-month');
+    const filterYearEl = document.getElementById('filter-year');
+
+
+    // --- HELPER FUNCTIONS ---
+    const formatMoney = (number) => Number(number).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const formatAbbreviatedMoney = (number) => {
+        if (Math.abs(number) < 1.0e+6) {
+            return formatMoney(number);
+        }
+        const suffixes = ["", "K", "M", "B", "T"];
+        const suffixNum = Math.floor(Math.log10(Math.abs(number)) / 3);
+        let shortValue = (number / Math.pow(1000, suffixNum)).toFixed(2);
+        return shortValue + suffixes[suffixNum];
+    };
+    const formatNumberInput = (value) => value ? parseFloat(String(value).replace(/,/g, '')).toLocaleString('en-US') : '';
+    const unformatNumberInput = (value) => value.replace(/,/g, '');
+    const onInputNumberFormat = (event) => {
+        const input = event.target;
+        const value = input.value;
+        const numericValue = value.replace(/[^\d]/g, '');
+        input.value = numericValue ? Number(numericValue).toLocaleString('en-US') : '';
+    };
+
+    // --- MAIN APP LOGIC ---
+    const handleLogin = async (e) => { e.preventDefault(); const email = document.getElementById('login-email').value; const password = document.getElementById('login-password').value; const { error } = await db.auth.signInWithPassword({ email, password }); if (error) alert(error.message); };
+    const handleLogout = async () => { const { error } = await db.auth.signOut(); if (error) console.error("Logout Error:", error); };
+    const fetchAllInvestments = async () => { 
+    try { 
+        const { data: { user } } = await db.auth.getUser(); 
+        const { data, error } = await db.from('investments').select('*').order('investment_date', { ascending: false }); 
+        if (error) throw error; 
+        allInvestments = data; 
+        const { data: snaps, error: err2 } = await db.from('yearly_snapshots').select('*').eq('user_id', user.id);
+        if (!err2) yearlySnapshots = snaps;
+        populateAssetNameDatalist(allInvestments); 
+        renderUI(); 
+    } catch (error) { console.error('Error:', error); } 
+};
+    const addInvestment = async (e) => { e.preventDefault(); try { const { data: { user } } = await db.auth.getUser(); const amount = +document.getElementById('amount').value; const newInvestment = { user_id: user.id, asset_type: document.getElementById('asset_type').value, asset_name: document.getElementById('asset_name').value, amount, current_value: amount, investment_date: investmentDateEl.value }; const { error } = await db.from('investments').insert(newInvestment); if (error) throw error; await fetchAllInvestments(); document.getElementById('investment-form').reset(); investmentDateEl.valueAsDate = new Date(); } catch (error) { console.error('Error adding investment:', error); alert('เกิดข้อผิดพลาด: ' + error.message); } };
+    const removeInvestment = async (id) => { if (!confirm('คุณแน่ใจว่าต้องการลบรายการนี้?')) return; try { const { error } = await db.from('investments').delete().eq('id', id); if (error) throw error; await fetchAllInvestments(); } catch (error) { console.error('Error deleting investment:', error); alert('เกิดข้อผิดพลาด: ' + error.message); } };
+    
+    const handleEditInvestment = async (e) => {
+        e.preventDefault();
+        const id = document.getElementById('edit-investment-id').value;
+        const updatedInvestment = {
+            asset_type: document.getElementById('edit-asset-type').value,
+            asset_name: document.getElementById('edit-asset-name').value,
+            amount: +document.getElementById('edit-amount').value,
+            current_value: +document.getElementById('edit-current-value').value,
+            investment_date: document.getElementById('edit-investment-date').value
+        };
+        try {
+            const { error } = await db.from('investments').update(updatedInvestment).eq('id', id);
+            if (error) throw error;
+            editInvestmentModalContainer.classList.add('hidden');
+            await fetchAllInvestments();
+        } catch (error) { alert('เกิดข้อผิดพลาด: ' + error.message); }
+    };
+    
+    window.openEditModal = (id) => {
+        const investment = allInvestments.find(inv => inv.id === id);
+        if (!investment) return;
+        document.getElementById('edit-investment-id').value = investment.id;
+        document.getElementById('edit-asset-type').value = investment.asset_type;
+        document.getElementById('edit-asset-name').value = investment.asset_name;
+        document.getElementById('edit-amount').value = investment.amount;
+        document.getElementById('edit-current-value').value = investment.current_value;
+        document.getElementById('edit-investment-date').value = investment.investment_date;
+        editInvestmentModalContainer.classList.remove('hidden');
+    };
+
+    const populateAssetNameDatalist = (investments) => {
+        const assetNames = [...new Set(investments.map(inv => inv.asset_name))];
+        const datalist = document.getElementById('asset-names-list');
+        datalist.innerHTML = ''; 
+        assetNames.forEach(name => {
+            const option = document.createElement('option');
+            option.value = name;
+            datalist.appendChild(option);
+        });
+    };
+
+    window.openUpdateValueModal = (assetType) => {
+        const investmentsForType = allInvestments.filter(inv => inv.asset_type === assetType);
+        const totalInvestment = investmentsForType.reduce((sum, inv) => sum + inv.amount, 0);
+        const currentTotalValue = investmentsForType.reduce((sum, inv) => sum + inv.current_value, 0);
+        document.getElementById('update-value-title').innerText = `อัปเดตมูลค่ารวม: ${assetType}`;
+        document.getElementById('update-asset-type').value = assetType;
+        document.getElementById('update-total-investment').value = formatMoney(totalInvestment);
+        document.getElementById('update-current-total-value').value = formatMoney(currentTotalValue);
+        document.getElementById('new-total-value').value = currentTotalValue.toFixed(2);
+        updateValueModalContainer.classList.remove('hidden');
+    };
+
+    const handleBulkUpdateValue = async (e) => {
+        e.preventDefault();
+        const assetType = document.getElementById('update-asset-type').value;
+        const newTotalValue = parseFloat(document.getElementById('new-total-value').value);
+        if (isNaN(newTotalValue) || newTotalValue < 0) { alert('กรุณากรอกมูลค่าที่ถูกต้อง'); return; }
+        const investmentsForType = allInvestments.filter(inv => inv.asset_type === assetType);
+        const totalInvestment = investmentsForType.reduce((sum, inv) => sum + inv.amount, 0);
+        let updatePromises;
+        if (totalInvestment > 0) {
+            updatePromises = investmentsForType.map(inv => {
+                const proportion = inv.amount / totalInvestment;
+                const newProRatedValue = newTotalValue * proportion;
+                return db.from('investments').update({ current_value: newProRatedValue }).eq('id', inv.id);
+            });
+        } else if (investmentsForType.length > 0) {
+            const equalValue = newTotalValue / investmentsForType.length;
+            updatePromises = investmentsForType.map(inv => db.from('investments').update({ current_value: equalValue }).eq('id', inv.id));
+        } else { return; }
+        const results = await Promise.all(updatePromises);
+        const firstError = results.find(res => res.error)?.error;
+        if (firstError) { alert('เกิดข้อผิดพลาด: ' + firstError.message); } 
+        else { updateValueModalContainer.classList.add('hidden'); await fetchAllInvestments(); }
+    };
+
+    const setView = (view) => {
+        currentView = view;
+        document.querySelectorAll('.view-toggle-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelector(`.view-toggle-btn[onclick="setView('${view}')"]`).classList.add('active');
+        summaryView.classList.toggle('hidden', view !== 'summary');
+        analysisView.classList.toggle('hidden', view !== 'analysis');
+        retirementView.classList.toggle('hidden', view !== 'retirement');
+        const isAuxiliaryView = view === 'analysis' || view === 'retirement';
+        addInvestmentSection.classList.toggle('hidden', isAuxiliaryView);
+        if (view === 'retirement') {
+            const totalCurrentValue = allInvestments.reduce((acc, t) => acc + t.current_value, 0);
+            retirementInitialInvestmentEl.value = formatNumberInput(totalCurrentValue.toFixed(0));
+        }
+        renderUI();
+    };
+    
+    const setupFilters = () => {
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    filterMonthEl.innerHTML = '<option value="all" selected>ทุกเดือน</option>'; 
+    const months = ["มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน", "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"];
+    months.forEach((month, index) => {
+        filterMonthEl.innerHTML += `<option value="${index + 1}">${month}</option>`;
+    });
+    const yearsWithData = [...new Set(allInvestments.map(inv => new Date(inv.investment_date).getFullYear()))];
+    const years = yearsWithData.length > 0 ? yearsWithData : [currentYear];
+    const minYear = Math.min(...years);
+    const maxYear = Math.max(currentYear, ...years);
+    filterYearEl.innerHTML = '<option value="all" selected>ทุกปี</option>'; 
+    for (let year = maxYear; year >= minYear; year--) {
+        filterYearEl.innerHTML += `<option value="${year}">${year + 543}</option>`;
+    }
+};
+
+    const renderUI = () => {
+        const selectedMonth = filterMonthEl.value;
+        const selectedYear = filterYearEl.value;
+        let filteredInvestments = allInvestments;
+        if (currentView === 'summary') {
+            if (selectedYear !== 'all') filteredInvestments = filteredInvestments.filter(inv => new Date(inv.investment_date).getFullYear() == selectedYear);
+            if (selectedMonth !== 'all') filteredInvestments = filteredInvestments.filter(inv => (new Date(inv.investment_date).getMonth() + 1) == selectedMonth);
+        }
+        updateDashboard(allInvestments); 
+        if (currentView === 'summary') renderSummaryByType(filteredInvestments); 
+        else if (currentView === 'analysis') renderAnalysisView(allInvestments); 
+    };
+
+    const updateDashboard = (investments) => {
+        const totalInvestment = investments.reduce((acc, t) => acc + t.amount, 0);
+        const currentValue = investments.reduce((acc, t) => acc + t.current_value, 0);
+        const profitLoss = currentValue - totalInvestment;
+        const profitLossPercent = totalInvestment > 0 ? (profitLoss / totalInvestment) * 100 : 0;
+        document.getElementById('total-investment').innerHTML = `฿${formatAbbreviatedMoney(totalInvestment)}`;
+        document.getElementById('current-value').innerHTML = `฿${formatAbbreviatedMoney(currentValue)}`;
+        const profitLossEl = document.getElementById('profit-loss');
+        const plClass = profitLoss >= 0 ? 'positive' : 'negative';
+        profitLossEl.innerHTML = `฿${formatAbbreviatedMoney(profitLoss)} <span class="sub-amount ${plClass}">(${profitLossPercent.toFixed(2)}%)</span>`;
+        profitLossEl.className = `amount ${plClass}`;
+    };
+    
+    window.toggleDetails = (type) => {
+        const detailsRow = document.getElementById(`details-for-${type.replace(/\s/g, '-')}`);
+        if (detailsRow) detailsRow.classList.toggle('hidden');
+    };
+    
+    const renderSummaryByType = (investments) => {
+        const tableEl = document.getElementById('summary-table');
+        if (investments.length === 0) {
+            tableEl.innerHTML = `<thead><tr><th>ประเภทสินทรัพย์</th><th>เงินลงทุน</th><th>มูลค่าปัจจุบัน</th><th>กำไร/ขาดทุน</th><th>% กำไร/ขาดทุน</th><th>จัดการ</th></tr></thead><tbody><tr><td colspan="6" style="text-align:center; padding: 20px;">ไม่พบรายการลงทุนในเดือน/ปีที่เลือก</td></tr></tbody>`;
+            return;
+        }
+        const summaryData = investments.reduce((acc, t) => { 
+            if (!acc[t.asset_type]) { acc[t.asset_type] = { investment: 0, currentValue: 0, items: [] }; } 
+            acc[t.asset_type].investment += t.amount; acc[t.asset_type].currentValue += t.current_value; acc[t.asset_type].items.push(t);
+            return acc; 
+        }, {});
+        let tableHTML = `<thead><tr><th>ประเภทสินทรัพย์</th><th>เงินลงทุน</th><th>มูลค่าปัจจุบัน</th><th>กำไร/ขาดทุน</th><th>% กำไร/ขาดทุน</th><th>จัดการ</th></tr></thead><tbody>`;
+        Object.keys(summaryData).sort().forEach(type => {
+            const data = summaryData[type];
+            const profitLoss = data.currentValue - data.investment;
+            const percent = data.investment > 0 ? (profitLoss / data.investment) * 100 : 0;
+            const typeId = type.replace(/\s/g, '-');
+            tableHTML += `<tr class="summary-row" onclick="toggleDetails('${type}')">
+                <td data-label="ประเภท">${type} <button class="btn-small btn-mobile-only" onclick="event.stopPropagation(); openUpdateValueModal('${type}')">อัปเดต</button></td>
+                <td data-label="เงินลงทุน">${formatAbbreviatedMoney(data.investment)}</td>
+                <td data-label="มูลค่าปัจจุบัน">${formatAbbreviatedMoney(data.currentValue)}</td>
+                <td data-label="กำไร/ขาดทุน" class="${profitLoss >= 0 ? 'positive' : 'negative'}">${formatAbbreviatedMoney(profitLoss)}</td>
+                <td data-label="% กำไร/ขาดทุน" class="${percent >= 0 ? 'positive' : 'negative'}">${percent.toFixed(2)}%</td>
+                <td data-label="จัดการ" class="desktop-only-cell">
+                    <button class="btn-small btn-secondary" onclick="event.stopPropagation(); openUpdateValueModal('${type}')">อัปเดตมูลค่ารวม</button>
+                </td>
+            </tr>`;
+            tableHTML += `<tr id="details-for-${typeId}" class="details-row hidden"><td colspan="6" class="details-content">`;
+            if (data.items.length > 0) {
+                 data.items.sort((a,b) => new Date(b.investment_date) - new Date(a.investment_date)).forEach(t => {
+                    const itemProfitLoss = t.current_value - t.amount;
+                    const itemClass = itemProfitLoss >= 0 ? 'positive' : 'negative';
+                    const formattedDate = new Date(t.investment_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC' });
+                    tableHTML += `<div class="investment-item">
+                        <div style="flex-direction: column; gap: 4px; text-align: left; word-break: break-all;">
+                            <span style="font-weight: 500;">${t.asset_name}</span>
+                            <span style="font-size: 0.85rem; color: #666;">ลงทุน: ฿${formatMoney(t.amount)} (${formattedDate})</span>
+                        </div>
+                        <div class="investment-item-actions">
+                            <span class="${itemClass}" style="font-weight: 600; font-size: 0.9rem; text-align: right;">
+                                ฿${formatMoney(t.current_value)}
+                                <span style="font-size: 0.8rem; font-weight: 500;">(${itemProfitLoss >= 0 ? '+' : ''}${formatMoney(itemProfitLoss)})</span>
+                            </span>
+                            <div class="investment-item-buttons">
+                                <button class="btn-small-secondary" onclick="event.stopPropagation(); openEditModal(${t.id})">แก้ไข</button>
+                                <button class="btn-small-danger" onclick="event.stopPropagation(); removeInvestment(${t.id})">ลบ</button>
+                            </div>
+                        </div>
+                    </div>`;
+                });
+            }
+            tableHTML += `</td></tr>`;
+        });
+        tableHTML += `</tbody>`; tableEl.innerHTML = tableHTML;
+    };
+    
+    const renderAnalysisView = (investments) => {
+        const tableEl = document.getElementById('yearly-summary-table');
+        if (investments.length === 0) { tableEl.innerHTML = '<tr><td colspan="8" style="text-align:center; padding: 20px;">ยังไม่มีข้อมูลการลงทุน</td></tr>'; return; }
+        const sortedInvestments = [...investments].sort((a, b) => new Date(a.investment_date) - new Date(b.investment_date));
+        const firstYear = new Date(sortedInvestments[0].investment_date).getFullYear();
+        const lastYear = new Date().getFullYear();
+        let yearlyData = {}; let lastYearPortfolioValue = 0;
+        for (let year = firstYear; year <= lastYear; year++) {
+            const investmentsInYear = sortedInvestments.filter(t => new Date(t.investment_date).getFullYear() === year);
+            const investmentsUpToYear = sortedInvestments.filter(t => new Date(t.investment_date).getFullYear() <= year);
+            const newInvestment = investmentsInYear.reduce((sum, t) => sum + t.amount, 0);
+            const totalInvestment = investmentsUpToYear.reduce((sum, t) => sum + t.amount, 0);
+            const snapshot = yearlySnapshots.find(s => s.year === year);
+            let portfolioValue; let isLocked = false;
+            if (snapshot) { portfolioValue = snapshot.portfolio_value; isLocked = true; } 
+            else portfolioValue = investmentsUpToYear.reduce((sum, t) => sum + t.current_value, 0);
+            const totalGainLoss = portfolioValue - totalInvestment;
+            const annualGainLoss = (portfolioValue - lastYearPortfolioValue) - newInvestment;
+            const beginningOfYearValue = lastYearPortfolioValue + newInvestment;
+            const annualReturnPercent = beginningOfYearValue > 0 ? (annualGainLoss / beginningOfYearValue) * 100 : 0;
+            yearlyData[year] = { newInvestment, totalInvestment, portfolioValue, totalGainLoss, annualGainLoss, annualReturnPercent, isLocked };
+            lastYearPortfolioValue = portfolioValue;
+        }
+        let tableHTML = `<thead><tr><th>ปี</th><th>เงินลงทุนใหม่</th><th>เงินลงทุนสะสม</th><th>มูลค่าพอร์ตสิ้นปี</th><th>กำไร/ขาดทุนสะสม</th><th>กำไร/ขาดทุนปีนี้</th><th>% ผลตอบแทน</th><th>จัดการ</th></tr></thead><tbody>`;
+        Object.keys(yearlyData).sort((a,b) => b-a).forEach(year => {
+            const data = yearlyData[year];
+            tableHTML += `<tr>
+                <td data-label="ปี" style="font-weight: 500;">${parseInt(year) + 543}</td>
+                <td data-label="เงินลงทุนใหม่">${formatAbbreviatedMoney(data.newInvestment)}</td>
+                <td data-label="เงินลงทุนสะสม">${formatAbbreviatedMoney(data.totalInvestment)}</td>
+                <td data-label="มูลค่าพอร์ตสิ้นปี" style="${data.isLocked ? 'font-weight:bold; color:var(--primary-color);' : ''}">
+                    ${formatAbbreviatedMoney(data.portfolioValue)} ${data.isLocked ? '🔒' : ''}
+                </td>
+                <td data-label="กำไร/ขาดทุนสะสม" class="${data.totalGainLoss >= 0 ? 'positive' : 'negative'}">${formatAbbreviatedMoney(data.totalGainLoss)}</td>
+                <td data-label="กำไร/ขาดทุนปีนี้" class="${data.annualGainLoss >= 0 ? 'positive' : 'negative'}">${formatAbbreviatedMoney(data.annualGainLoss)}</td>
+                <td data-label="% ผลตอบแทน" class="${data.annualReturnPercent >= 0 ? 'positive' : 'negative'}">${data.annualReturnPercent.toFixed(2)}%</td>
+                <td data-label="จัดการ">
+                    <button class="btn-small btn-secondary" onclick="saveSnapshot(${year}, ${data.totalInvestment})">
+                        ${data.isLocked ? 'แก้ไขค่า' : 'บันทึกค่าสิ้นปี'}
+                    </button>
+                </td>
+            </tr>`;
+        });
+        tableHTML += `</tbody>`; tableEl.innerHTML = tableHTML;
+    };
+    
+    function calculateRetirement(event) {
+        event.preventDefault(); retirementErrorMessage.textContent = '';
+        const initial = parseFloat(unformatNumberInput(retirementInitialInvestmentEl.value)) || 0;
+        const monthly = parseFloat(unformatNumberInput(retirementMonthlyInvestmentEl.value)) || 0;
+        const annualReturn = parseFloat(retirementAnnualReturnEl.value) || 0;
+        const birthDate = new Date(retirementBirthDateEl.value);
+        const retirementAge = parseInt(retirementAgeEl.value);
+        const lifeExpectancy = parseInt(retirementLifeExpectancyEl.value);
+        if (!retirementBirthDateEl.value || !retirementAge || !lifeExpectancy || retirementAge <= 0 || lifeExpectancy <= retirementAge) { retirementErrorMessage.textContent = 'กรุณากรอกข้อมูลให้ถูกต้อง'; retirementResultsDiv.classList.add('hidden'); return; }
+        const today = new Date();
+        let currentAge = today.getFullYear() - birthDate.getFullYear();
+        const m = today.getMonth() - birthDate.getMonth();
+        if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) currentAge--;
+        if (retirementAge <= currentAge) { retirementErrorMessage.textContent = 'อายุที่ต้องการเกษียณต้องมากกว่าอายุุุ-ปัจจุบัน'; return; }
+        const yearsToInvest = retirementAge - currentAge;
+        const yearsInRetirement = lifeExpectancy - retirementAge;
+        const monthlyReturn = annualReturn / 100 / 12;
+        const totalMonthsToInvest = yearsToInvest * 12;
+        const totalMonthsInRetirement = yearsInRetirement * 12;
+        const fvInitial = initial * Math.pow(1 + monthlyReturn, totalMonthsToInvest);
+        const fvMonthly = monthly * ((Math.pow(1 + monthlyReturn, totalMonthsToInvest) - 1) / monthlyReturn);
+        const totalNestEgg = fvInitial + fvMonthly;
+        let monthlyWithdrawal = 0;
+        if (monthlyReturn > 0 && isFinite(totalNestEgg)) { monthlyWithdrawal = totalNestEgg * (monthlyReturn * Math.pow(1 + monthlyReturn, totalMonthsInRetirement)) / (Math.pow(1 + monthlyReturn, totalMonthsInRetirement) - 1); } 
+        else if (isFinite(totalNestEgg) && totalMonthsInRetirement > 0) monthlyWithdrawal = totalNestEgg / totalMonthsInRetirement;
+        displayRetirementResults({ yearsToInvest, retirementAge, totalNestEgg, yearsInRetirement, lifeExpectancy, monthlyWithdrawal });
+        saveRetirementDataToLocalStorage();
+    }
+    function displayRetirementResults(data) {
+        const formatter = new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' });
+        retirementYearsToInvestSpan.textContent = data.yearsToInvest.toFixed(0);
+        retirementAgeAtRetirementSpan.textContent = data.retirementAge;
+        retirementTotalSpan.textContent = formatter.format(data.totalNestEgg);
+        retirementYearsInRetirementSpan.textContent = data.yearsInRetirement.toFixed(0);
+        retirementAgeAtEndSpan.textContent = data.lifeExpectancy;
+        retirementMonthlyWithdrawalSpan.textContent = formatter.format(data.monthlyWithdrawal);
+        retirementResultsDiv.classList.remove('hidden');
+    }
+    function saveRetirementDataToLocalStorage() {
+        const data = { initialInvestment: unformatNumberInput(retirementInitialInvestmentEl.value), monthlyInvestment: unformatNumberInput(retirementMonthlyInvestmentEl.value), annualReturn: retirementAnnualReturnEl.value, birthDate: retirementBirthDateEl.value, retirementAge: retirementAgeEl.value, lifeExpectancy: retirementLifeExpectancyEl.value };
+        localStorage.setItem(RETIREMENT_STORAGE_KEY, JSON.stringify(data));
+    }
+    function loadRetirementDataFromLocalStorage() {
+        const savedData = localStorage.getItem(RETIREMENT_STORAGE_KEY);
+        if (savedData) {
+            const data = JSON.parse(savedData);
+            retirementInitialInvestmentEl.value = formatNumberInput(data.initialInvestment);
+            retirementMonthlyInvestmentEl.value = formatNumberInput(data.monthlyInvestment);
+            retirementAnnualReturnEl.value = data.annualReturn;
+            retirementBirthDateEl.value = data.birthDate;
+            retirementAgeEl.value = data.retirementAge;
+            retirementLifeExpectancyEl.value = data.lifeExpectancy;
+        }
+    }
+    function resetAllData() { retirementForm.reset(); localStorage.removeItem(RETIREMENT_STORAGE_KEY); retirementResultsDiv.classList.add('hidden'); retirementErrorMessage.textContent = ''; }
+
+    const initializeApp = async () => {
+        const { data: { session } } = await db.auth.getSession();
+        if (session) {
+            authContainer.classList.add('hidden'); appContainer.classList.remove('hidden');
+            userEmailDisplay.textContent = session.user.email;
+            investmentDateEl.valueAsDate = new Date();
+            await fetchAllInvestments();
+            setupFilters(); renderUI(); 
+        } else { authContainer.classList.remove('hidden'); appContainer.classList.add('hidden'); }
+        loadRetirementDataFromLocalStorage();
+    };
+    db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN') initializeApp(); else if (event === 'SIGNED_OUT') location.reload(); });
+    document.getElementById('login-form').addEventListener('submit', handleLogin);
+    document.getElementById('logout-btn').addEventListener('click', handleLogout);
+    document.getElementById('investment-form').addEventListener('submit', addInvestment);
+    document.getElementById('update-value-form').addEventListener('submit', handleBulkUpdateValue);
+    document.getElementById('edit-investment-form').addEventListener('submit', handleEditInvestment);
+    retirementForm.addEventListener('submit', calculateRetirement);
+    retirementResetButton.addEventListener('click', resetAllData);
+    retirementInitialInvestmentEl.addEventListener('input', onInputNumberFormat);
+    retirementMonthlyInvestmentEl.addEventListener('input', onInputNumberFormat);
+    filterMonthEl.addEventListener('change', renderUI);
+    filterYearEl.addEventListener('change', renderUI);
+    initializeApp();
+    </script>
+</body>
+</html>
