@@ -514,25 +514,27 @@
     // ==========================================
 
     window.saveSnapshot = async (year, totalInvest) => {
-        const value = prompt(`ระบุมูลค่าพอร์ตสุทธิ ณ สิ้นปี พ.ศ. ${year + 543}:`);
-        if (value === null || isNaN(parseFloat(value))) return;
+    const value = prompt(`ระบุมูลค่าพอร์ตสุทธิ ณ สิ้นปี พ.ศ. ${year + 543}:`);
+    if (value === null || isNaN(parseFloat(value))) return;
 
-        try {
-            const { data: { user } } = await db.auth.getUser();
-            const { error } = await db.from('yearly_snapshots').upsert({
-                user_id: user.id,
-                year: year,
-                portfolio_value: parseFloat(value),
-                total_investment: totalInvest
-            });
+    try {
+        const { data: { user } } = await db.auth.getUser();
+        
+        // แก้ไขบรรทัดนี้ เพิ่ม { onConflict: 'user_id,year' }
+        const { error } = await db.from('yearly_snapshots').upsert({
+            user_id: user.id,
+            year: year,
+            portfolio_value: parseFloat(value),
+            total_investment: totalInvest
+        }, { onConflict: 'user_id,year' }); // <--- เพิ่มส่วนนี้เข้าไป
 
-            if (error) throw error;
-            alert('บันทึกข้อมูลเรียบร้อยแล้ว');
-            await fetchAllInvestments(); 
-        } catch (error) {
-            alert('เกิดข้อผิดพลาด: ' + error.message);
-        }
-    };
+        if (error) throw error;
+        alert('บันทึกข้อมูลเรียบร้อยแล้ว');
+        await fetchAllInvestments(); 
+    } catch (error) {
+        alert('เกิดข้อผิดพลาด: ' + error.message);
+    }
+};
 
     const authContainer = document.getElementById('auth-container');
     const appContainer = document.getElementById('app-container');
