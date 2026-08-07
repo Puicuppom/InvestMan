@@ -183,6 +183,21 @@
         .modal-content .form-info { font-size: 0.9rem; color: #6c757d; }
         .modal-content .button-group { display: flex; gap: 15px; margin-top: 25px; }
         .modal-content .button-group button { flex: 1; }
+
+        .asset-type-header {
+            display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px;
+        }
+        .asset-type-header label { margin-bottom: 0; }
+        .asset-type-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; max-height: 320px; overflow-y: auto; }
+        .asset-type-item {
+            display: flex; justify-content: space-between; align-items: center; gap: 10px;
+            padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 6px; background: #f8f9fa;
+        }
+        .asset-type-item-name { font-weight: 500; word-break: break-word; flex: 1; }
+        .asset-type-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+        .asset-type-add-row { display: flex; gap: 10px; align-items: stretch; }
+        .asset-type-add-row input { flex: 1; padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 5px; font-family: inherit; font-size: 1rem; }
+        .asset-type-add-row button { white-space: nowrap; }
         
         /* Filter Styles */
         .filter-container {
@@ -428,12 +443,12 @@
             <div class="section" id="add-investment-section">
                 <h2 class="section-title">เพิ่มรายการลงทุน</h2>
                 <form id="investment-form">
-                    <div class="form-group"><label for="asset_type">ประเภทสินทรัพย์</label>
-                        <select id="asset_type">
-                            <option value="หุ้นไทย">หุ้นไทย</option><option value="หุ้นต่างประเทศ">หุ้นต่างประเทศ</option>
-                            <option value="กองทุนรวม">กองทุนรวม</option><option value="คริปโตเคอร์เรนซี">คริปโตเคอร์เรนซี</option>
-                            <option value="อสังหาริมทรัพย์">อสังหาริมทรัพย์</option><option value="อื่นๆ">อื่นๆ</option>
-                        </select>
+                    <div class="form-group">
+                        <div class="asset-type-header">
+                            <label for="asset_type">ประเภทสินทรัพย์</label>
+                            <button type="button" id="manage-asset-types-btn" class="btn-small btn-secondary">จัดการประเภท</button>
+                        </div>
+                        <select id="asset_type" required></select>
                     </div>
                     <div class="form-group">
                         <label for="asset_name">ชื่อสินทรัพย์ (เช่น PTT, B-INNOTECH)</label>
@@ -475,11 +490,7 @@
             <form id="edit-investment-form">
                 <input type="hidden" id="edit-investment-id">
                 <div class="form-group"><label for="edit-asset-type">ประเภทสินทรัพย์</label>
-                    <select id="edit-asset-type">
-                        <option value="หุ้นไทย">หุ้นไทย</option><option value="หุ้นต่างประเทศ">หุ้นต่างประเทศ</option>
-                        <option value="กองทุนรวม">กองทุนรวม</option><option value="คริปโตเคอร์เรนซี">คริปโตเคอร์เรนซี</option>
-                        <option value="อสังหาริมทรัพย์">อสังหาริมทรัพย์</option><option value="อื่นๆ">อื่นๆ</option>
-                    </select>
+                    <select id="edit-asset-type" required></select>
                 </div>
                 <div class="form-group"><label for="edit-asset-name">ชื่อสินทรัพย์</label><input type="text" id="edit-asset-name" required></div>
                 <div class="form-group"><label for="edit-amount">จำนวนเงินลงทุน</label><input type="number" step="0.01" id="edit-amount" required></div>
@@ -492,6 +503,21 @@
             </form>
         </div>
     </div>
+
+    <div id="manage-asset-types-modal-container" class="modal-container hidden">
+        <div class="modal-content">
+            <h2 class="section-title">จัดการประเภทสินทรัพย์</h2>
+            <p class="form-info" style="margin-bottom: 15px;">ใช้ประเภทเพื่อแยกกลุ่มพอร์ต เช่น พอร์ตเกษียณ, พอร์ตสั้น</p>
+            <div id="asset-types-list" class="asset-type-list"></div>
+            <div class="asset-type-add-row">
+                <input type="text" id="new-asset-type-name" placeholder="ชื่อประเภทใหม่" maxlength="80">
+                <button type="button" id="add-asset-type-btn" class="btn-primary">เพิ่ม</button>
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn-light" id="close-manage-asset-types-btn">ปิด</button>
+            </div>
+        </div>
+    </div>
     <script>
     const SUPABASE_URL = "https://fmbympgecspgqtnazrbm.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtYnltcGdlY3NwZ3F0bmF6cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3NDkwOTksImV4cCI6MjA2NjMyNTA5OX0.rqOrNDNRTF7WnDS6utTTKfFoNZKPiMZV_ttqYzYCaJs";
@@ -501,7 +527,9 @@
     // --- GLOBAL VARIABLES ---
     let allInvestments = [];
     let yearlySnapshots = [];
+    let allAssetTypes = [];
     let currentView = 'summary';
+    const DEFAULT_ASSET_TYPES = ['หุ้นต่างประเทศ', 'กองทุนรวม'];
 
     // === ส่วนที่เพิ่มสำหรับปักหมุด (Service Worker) ===
     if ('serviceWorker' in navigator) {
@@ -565,6 +593,9 @@
     const RETIREMENT_STORAGE_KEY = 'retirementCalculatorData';
     const filterMonthEl = document.getElementById('filter-month');
     const filterYearEl = document.getElementById('filter-year');
+    const manageAssetTypesModal = document.getElementById('manage-asset-types-modal-container');
+    const assetTypesListEl = document.getElementById('asset-types-list');
+    const newAssetTypeNameEl = document.getElementById('new-asset-type-name');
 
 
     // --- HELPER FUNCTIONS ---
@@ -580,11 +611,168 @@
     };
     const formatNumberInput = (value) => value ? parseFloat(String(value).replace(/,/g, '')).toLocaleString('en-US') : '';
     const unformatNumberInput = (value) => value.replace(/,/g, '');
+    const escapeHtml = (str) => String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
     const onInputNumberFormat = (event) => {
         const input = event.target;
         const value = input.value;
         const numericValue = value.replace(/[^\d]/g, '');
         input.value = numericValue ? Number(numericValue).toLocaleString('en-US') : '';
+    };
+
+    // --- ASSET TYPES ---
+    const fetchAssetTypes = async () => {
+        const { data, error } = await db.from('asset_types')
+            .select('*')
+            .order('sort_order', { ascending: true })
+            .order('name', { ascending: true });
+        if (error) throw error;
+        allAssetTypes = data || [];
+        return allAssetTypes;
+    };
+
+    const ensureDefaultAssetTypes = async () => {
+        const { data: { user } } = await db.auth.getUser();
+        if (!user) return;
+
+        await fetchAssetTypes();
+        const existingNames = new Set(allAssetTypes.map(t => t.name));
+        const namesFromInvestments = [...new Set(allInvestments.map(inv => inv.asset_type).filter(Boolean))];
+        const namesToSeed = [...new Set([...DEFAULT_ASSET_TYPES, ...namesFromInvestments])]
+            .filter(name => !existingNames.has(name));
+
+        if (namesToSeed.length === 0) {
+            populateTypeSelects();
+            return;
+        }
+
+        const rows = namesToSeed.map((name, index) => ({
+            user_id: user.id,
+            name,
+            sort_order: allAssetTypes.length + index
+        }));
+        const { error } = await db.from('asset_types').insert(rows);
+        if (error) throw error;
+        await fetchAssetTypes();
+        populateTypeSelects();
+    };
+
+    const populateTypeSelects = (selectedAdd = null, selectedEdit = null) => {
+        const addSelect = document.getElementById('asset_type');
+        const editSelect = document.getElementById('edit-asset-type');
+        const prevAdd = selectedAdd ?? addSelect.value;
+        const prevEdit = selectedEdit ?? editSelect.value;
+
+        const optionsHtml = allAssetTypes.length
+            ? allAssetTypes.map(t => `<option value="${escapeHtml(t.name)}">${escapeHtml(t.name)}</option>`).join('')
+            : '<option value="" disabled selected>ยังไม่มีประเภท — กดจัดการประเภท</option>';
+
+        addSelect.innerHTML = optionsHtml;
+        editSelect.innerHTML = optionsHtml;
+
+        if (prevAdd && [...addSelect.options].some(o => o.value === prevAdd)) addSelect.value = prevAdd;
+        if (prevEdit && [...editSelect.options].some(o => o.value === prevEdit)) editSelect.value = prevEdit;
+    };
+
+    const renderAssetTypesList = () => {
+        if (!allAssetTypes.length) {
+            assetTypesListEl.innerHTML = '<p class="form-info" style="text-align:center;">ยังไม่มีประเภทสินทรัพย์</p>';
+            return;
+        }
+        assetTypesListEl.innerHTML = allAssetTypes.map(t => {
+            const inUse = allInvestments.some(inv => inv.asset_type === t.name);
+            return `<div class="asset-type-item" data-id="${t.id}">
+                <span class="asset-type-item-name">${escapeHtml(t.name)}${inUse ? ' <span class="form-info">(มีรายการ)</span>' : ''}</span>
+                <div class="asset-type-item-actions">
+                    <button type="button" class="btn-small-secondary" data-action="rename" data-id="${t.id}" data-name="${escapeHtml(t.name)}">เปลี่ยนชื่อ</button>
+                    <button type="button" class="btn-small-danger" data-action="delete" data-id="${t.id}" data-name="${escapeHtml(t.name)}">ลบ</button>
+                </div>
+            </div>`;
+        }).join('');
+    };
+
+    const openManageAssetTypesModal = () => {
+        renderAssetTypesList();
+        newAssetTypeNameEl.value = '';
+        manageAssetTypesModal.classList.remove('hidden');
+    };
+
+    const closeManageAssetTypesModal = () => {
+        manageAssetTypesModal.classList.add('hidden');
+    };
+
+    const addAssetType = async () => {
+        const name = newAssetTypeNameEl.value.trim();
+        if (!name) { alert('กรุณากรอกชื่อประเภท'); return; }
+        if (allAssetTypes.some(t => t.name === name)) { alert('มีประเภทนี้อยู่แล้ว'); return; }
+        try {
+            const { data: { user } } = await db.auth.getUser();
+            const { error } = await db.from('asset_types').insert({
+                user_id: user.id,
+                name,
+                sort_order: allAssetTypes.length
+            });
+            if (error) throw error;
+            newAssetTypeNameEl.value = '';
+            await fetchAssetTypes();
+            populateTypeSelects(name);
+            renderAssetTypesList();
+        } catch (error) {
+            alert('เกิดข้อผิดพลาด: ' + error.message);
+        }
+    };
+
+    const renameAssetType = async (id, oldName) => {
+        const newName = prompt('ชื่อประเภทใหม่:', oldName);
+        if (newName === null) return;
+        const trimmed = newName.trim();
+        if (!trimmed) { alert('ชื่อประเภทต้องไม่ว่าง'); return; }
+        if (trimmed === oldName) return;
+        if (allAssetTypes.some(t => t.name === trimmed && t.id !== id)) {
+            alert('มีประเภทนี้อยู่แล้ว');
+            return;
+        }
+        try {
+            const { data: { user } } = await db.auth.getUser();
+            const { error: typeError } = await db.from('asset_types').update({ name: trimmed }).eq('id', id);
+            if (typeError) throw typeError;
+            const { error: invError } = await db.from('investments')
+                .update({ asset_type: trimmed })
+                .eq('user_id', user.id)
+                .eq('asset_type', oldName);
+            if (invError) throw invError;
+            await fetchAssetTypes();
+            populateTypeSelects(
+                document.getElementById('asset_type').value === oldName ? trimmed : null,
+                document.getElementById('edit-asset-type').value === oldName ? trimmed : null
+            );
+            await fetchAllInvestments();
+            renderAssetTypesList();
+        } catch (error) {
+            alert('เกิดข้อผิดพลาด: ' + error.message);
+        }
+    };
+
+    const deleteAssetType = async (id, name) => {
+        const inUse = allInvestments.some(inv => inv.asset_type === name);
+        if (inUse) {
+            alert('ไม่สามารถลบได้ เพราะยังมีรายการลงทุนที่ใช้ประเภทนี้ — ย้ายหรือเปลี่ยนชื่อรายการก่อน');
+            return;
+        }
+        if (!confirm(`ลบประเภท "${name}" ?`)) return;
+        try {
+            const { error } = await db.from('asset_types').delete().eq('id', id);
+            if (error) throw error;
+            await fetchAssetTypes();
+            populateTypeSelects();
+            renderAssetTypesList();
+        } catch (error) {
+            alert('เกิดข้อผิดพลาด: ' + error.message);
+        }
     };
 
     // --- MAIN APP LOGIC ---
@@ -626,6 +814,7 @@
     window.openEditModal = (id) => {
         const investment = allInvestments.find(inv => inv.id === id);
         if (!investment) return;
+        populateTypeSelects(null, investment.asset_type);
         document.getElementById('edit-investment-id').value = investment.id;
         document.getElementById('edit-asset-type').value = investment.asset_type;
         document.getElementById('edit-asset-name').value = investment.asset_name;
@@ -912,6 +1101,7 @@
             userEmailDisplay.textContent = session.user.email;
             investmentDateEl.valueAsDate = new Date();
             await fetchAllInvestments();
+            await ensureDefaultAssetTypes();
             setupFilters(); renderUI(); 
         } else { authContainer.classList.remove('hidden'); appContainer.classList.add('hidden'); }
         loadRetirementDataFromLocalStorage();
@@ -922,6 +1112,20 @@
     document.getElementById('investment-form').addEventListener('submit', addInvestment);
     document.getElementById('update-value-form').addEventListener('submit', handleBulkUpdateValue);
     document.getElementById('edit-investment-form').addEventListener('submit', handleEditInvestment);
+    document.getElementById('manage-asset-types-btn').addEventListener('click', openManageAssetTypesModal);
+    document.getElementById('close-manage-asset-types-btn').addEventListener('click', closeManageAssetTypesModal);
+    document.getElementById('add-asset-type-btn').addEventListener('click', addAssetType);
+    newAssetTypeNameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addAssetType(); } });
+    assetTypesListEl.addEventListener('click', (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+        const { action, id, name } = btn.dataset;
+        if (action === 'rename') renameAssetType(id, name);
+        else if (action === 'delete') deleteAssetType(id, name);
+    });
+    manageAssetTypesModal.addEventListener('click', (e) => {
+        if (e.target === manageAssetTypesModal) closeManageAssetTypesModal();
+    });
     retirementForm.addEventListener('submit', calculateRetirement);
     retirementResetButton.addEventListener('click', resetAllData);
     retirementInitialInvestmentEl.addEventListener('input', onInputNumberFormat);
