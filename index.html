@@ -155,6 +155,9 @@
         .btn-small-danger:hover { background-color: var(--danger-hover-color); }
         .btn-small-secondary { padding: 4px 8px; font-size: 0.8rem; width: auto; display: inline-block; background-color: var(--secondary-color); color: white;}
         .btn-small-secondary:hover { background-color: var(--secondary-hover-color); }
+        .btn-small-secondary:disabled, .btn-small-danger:disabled {
+            opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none;
+        }
         .btn-mobile-only { display: none; }
         
         /* Summary Accordion Styles */
@@ -186,8 +189,10 @@
 
         .asset-type-header {
             display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px;
+            flex-wrap: wrap;
         }
         .asset-type-header label { margin-bottom: 0; }
+        .asset-type-header-actions { display: flex; gap: 8px; flex-wrap: wrap; }
         .asset-type-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; max-height: 320px; overflow-y: auto; }
         .asset-type-item {
             display: flex; justify-content: space-between; align-items: center; gap: 10px;
@@ -198,6 +203,9 @@
         .asset-type-add-row { display: flex; gap: 10px; align-items: stretch; }
         .asset-type-add-row input { flex: 1; padding: 12px 15px; border: 1px solid var(--border-color); border-radius: 5px; font-family: inherit; font-size: 1rem; }
         .asset-type-add-row button { white-space: nowrap; }
+        .form-group.checkbox-group { display: flex; align-items: center; gap: 10px; }
+        .form-group.checkbox-group input { width: auto; }
+        .form-group.checkbox-group label { margin-bottom: 0; }
         
         /* Filter Styles */
         .filter-container {
@@ -446,7 +454,11 @@
                     <div class="form-group">
                         <div class="asset-type-header">
                             <label for="asset_type">ประเภทสินทรัพย์</label>
-                            <button type="button" id="manage-asset-types-btn" class="btn-small btn-secondary">จัดการประเภท</button>
+                            <div class="asset-type-header-actions">
+                                <button type="button" id="open-sell-modal-btn" class="btn-small btn-secondary">ขายสินทรัพย์ (FIFO)</button>
+                                <button type="button" id="open-spend-cash-btn" class="btn-small btn-secondary">ใช้/ถอนเงินสด</button>
+                                <button type="button" id="manage-asset-types-btn" class="btn-small btn-secondary">จัดการประเภท</button>
+                            </div>
                         </div>
                         <select id="asset_type" required></select>
                     </div>
@@ -456,6 +468,10 @@
                         <datalist id="asset-names-list"></datalist>
                     </div>
                     <div class="form-group"><label for="amount">จำนวนเงินลงทุน</label><input type="number" step="0.01" id="amount" required></div>
+                    <div class="form-group checkbox-group">
+                        <input type="checkbox" id="use-cash-checkbox">
+                        <label for="use-cash-checkbox">ใช้เงินสดในพอร์ต <span id="cash-balance-hint" class="form-info"></span></label>
+                    </div>
                     <div class="form-group"><label for="investment_date">วันที่ลงทุน</label><input type="date" id="investment_date" required></div>
                     <button type="submit" class="btn-primary">เพิ่มรายการ</button>
                 </form>
@@ -507,7 +523,7 @@
     <div id="manage-asset-types-modal-container" class="modal-container hidden">
         <div class="modal-content">
             <h2 class="section-title">จัดการประเภทสินทรัพย์</h2>
-            <p class="form-info" style="margin-bottom: 15px;">ใช้ประเภทเพื่อแยกกลุ่มพอร์ต เช่น พอร์ตเกษียณ, พอร์ตสั้น</p>
+            <p class="form-info" style="margin-bottom: 15px;">กดค้างที่ ☰ แล้วลากสลับลำดับได้ (มือถือและคอมพิวเตอร์) — ประเภทบนสุดจะโชว์ก่อน</p>
             <div id="asset-types-list" class="asset-type-list"></div>
             <div class="asset-type-add-row">
                 <input type="text" id="new-asset-type-name" placeholder="ชื่อประเภทใหม่" maxlength="80">
@@ -518,6 +534,72 @@
             </div>
         </div>
     </div>
+
+    <div id="sell-modal-container" class="modal-container hidden">
+        <div class="modal-content">
+            <h2 class="section-title">ขายสินทรัพย์ (FIFO)</h2>
+            <p class="form-info" style="margin-bottom: 15px;">ตัดจาก lot เก่าสุดก่อน ไม่ลบประวัติซื้อ — ปีที่ล็อกมูลค่าสิ้นปีไว้จะไม่เพี้ยน</p>
+            <form id="sell-form">
+                <div class="form-group">
+                    <label for="sell-holding">สินทรัพย์ที่ถืออยู่</label>
+                    <select id="sell-holding" required></select>
+                </div>
+                <div class="form-group">
+                    <label>ต้นทุนคงเหลือ / มูลค่าปัจจุบัน</label>
+                    <input type="text" id="sell-holding-info" readonly style="background-color: #e9ecef;">
+                </div>
+                <div class="form-group">
+                    <label for="sell-cost">จำนวนเงินต้นทุนที่ขาย (บาท)</label>
+                    <input type="number" step="0.01" min="0.01" id="sell-cost" required>
+                </div>
+                <div class="form-group">
+                    <label for="sell-proceeds">เงินที่ได้จากการขาย (บาท)</label>
+                    <input type="number" step="0.01" min="0" id="sell-proceeds" required>
+                </div>
+                <div class="form-group">
+                    <label for="sell-date">วันที่ขาย</label>
+                    <input type="date" id="sell-date" required>
+                </div>
+                <div class="form-group checkbox-group">
+                    <input type="checkbox" id="sell-keep-cash" checked>
+                    <label for="sell-keep-cash">ถือเป็นเงินสดในพอร์ต</label>
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn-light" id="close-sell-modal-btn">ยกเลิก</button>
+                    <button type="submit" class="btn-primary">ยืนยันการขาย</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="spend-cash-modal-container" class="modal-container hidden">
+        <div class="modal-content">
+            <h2 class="section-title">ใช้ / ถอนเงินสด</h2>
+            <p class="form-info" style="margin-bottom: 15px;">หักเงินสดออกจากพอร์ต เช่น เอาไปใช้จ่าย — ไม่ถือเป็นเงินลงทุนใหม่</p>
+            <form id="spend-cash-form">
+                <div class="form-group">
+                    <label>เงินสดคงเหลือ</label>
+                    <input type="text" id="spend-cash-balance" readonly style="background-color: #e9ecef;">
+                </div>
+                <div class="form-group">
+                    <label for="spend-cash-amount">จำนวนที่ถอน (บาท)</label>
+                    <input type="number" step="0.01" min="0.01" id="spend-cash-amount" required>
+                </div>
+                <div class="form-group">
+                    <label for="spend-cash-date">วันที่</label>
+                    <input type="date" id="spend-cash-date" required>
+                </div>
+                <div class="form-group">
+                    <label for="spend-cash-note">หมายเหตุ (ไม่บังคับ)</label>
+                    <input type="text" id="spend-cash-note" placeholder="เช่น ค่าใช้จ่าย, โอนออก">
+                </div>
+                <div class="button-group">
+                    <button type="button" class="btn-light" id="close-spend-cash-btn">ยกเลิก</button>
+                    <button type="submit" class="btn-primary">ยืนยันการถอน</button>
+                </div>
+            </form>
+        </div>
+    </div>
     <script>
     const SUPABASE_URL = "https://fmbympgecspgqtnazrbm.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZtYnltcGdlY3NwZ3F0bmF6cmJtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTA3NDkwOTksImV4cCI6MjA2NjMyNTA5OX0.rqOrNDNRTF7WnDS6utTTKfFoNZKPiMZV_ttqYzYCaJs";
@@ -526,10 +608,13 @@
 
     // --- GLOBAL VARIABLES ---
     let allInvestments = [];
+    let allSales = [];
     let yearlySnapshots = [];
     let allAssetTypes = [];
     let currentView = 'summary';
     const DEFAULT_ASSET_TYPES = ['หุ้นต่างประเทศ', 'กองทุนรวม'];
+    const CASH_ASSET_TYPE = 'เงินสด';
+    const CASH_ASSET_NAME = 'เงินสด';
 
     // === ส่วนที่เพิ่มสำหรับปักหมุด (Service Worker) ===
     if ('serviceWorker' in navigator) {
@@ -596,6 +681,16 @@
     const manageAssetTypesModal = document.getElementById('manage-asset-types-modal-container');
     const assetTypesListEl = document.getElementById('asset-types-list');
     const newAssetTypeNameEl = document.getElementById('new-asset-type-name');
+    const sellModalContainer = document.getElementById('sell-modal-container');
+    const sellHoldingEl = document.getElementById('sell-holding');
+    const sellHoldingInfoEl = document.getElementById('sell-holding-info');
+    const sellCostEl = document.getElementById('sell-cost');
+    const sellProceedsEl = document.getElementById('sell-proceeds');
+    const sellDateEl = document.getElementById('sell-date');
+    const sellKeepCashEl = document.getElementById('sell-keep-cash');
+    const spendCashModal = document.getElementById('spend-cash-modal-container');
+    const useCashCheckbox = document.getElementById('use-cash-checkbox');
+    const cashBalanceHintEl = document.getElementById('cash-balance-hint');
 
 
     // --- HELPER FUNCTIONS ---
@@ -623,6 +718,74 @@
         const numericValue = value.replace(/[^\d]/g, '');
         input.value = numericValue ? Number(numericValue).toLocaleString('en-US') : '';
     };
+    const isCashInvestment = (inv) => inv.asset_type === CASH_ASSET_TYPE;
+    const holdingKey = (inv) => `${inv.asset_type}|||${inv.asset_name}`;
+    const parseHoldingKey = (key) => {
+        const idx = key.indexOf('|||');
+        return { asset_type: key.slice(0, idx), asset_name: key.slice(idx + 3) };
+    };
+    const soldCostAsOf = (investmentId, asOfDate = null) => allSales
+        .filter(s => Number(s.investment_id) === Number(investmentId) && (asOfDate === null || s.sold_date <= asOfDate))
+        .reduce((sum, s) => sum + Number(s.cost_basis), 0);
+    const remainingCost = (inv, asOfDate = null) => Math.max(0, Number(inv.amount) - soldCostAsOf(inv.id, asOfDate));
+    const remainingValue = (inv, asOfDate = null) => {
+        const cost = Number(inv.amount);
+        if (cost <= 0) return 0;
+        const rem = remainingCost(inv, asOfDate);
+        if (rem <= 0) return 0;
+        if (isCashInvestment(inv)) return rem;
+        return Number(inv.current_value) * (rem / cost);
+    };
+    const toYearEndDate = (year) => `${year}-12-31`;
+    const getCashBalance = () => allInvestments
+        .filter(isCashInvestment)
+        .reduce((sum, inv) => sum + remainingCost(inv), 0);
+    const updateCashBalanceHint = () => {
+        const bal = getCashBalance();
+        cashBalanceHintEl.textContent = bal > 0 ? `(คงเหลือ ฿${formatMoney(bal)})` : '(ยังไม่มีเงินสด)';
+        if (bal <= 0) useCashCheckbox.checked = false;
+    };
+    const buildFifoCashSaleRows = (userId, amount, soldDate) => {
+        const lots = allInvestments
+            .filter(inv => isCashInvestment(inv) && remainingCost(inv) > 0.00001)
+            .sort((a, b) => new Date(a.investment_date) - new Date(b.investment_date) || a.id - b.id);
+        const total = lots.reduce((sum, inv) => sum + remainingCost(inv), 0);
+        if (amount > total + 0.01) {
+            throw new Error(`เงินสดไม่พอ (คงเหลือ ฿${formatMoney(total)})`);
+        }
+        let left = amount;
+        const saleRows = [];
+        for (const lot of lots) {
+            if (left <= 0.00001) break;
+            const rem = remainingCost(lot);
+            const take = Math.min(rem, left);
+            saleRows.push({
+                user_id: userId,
+                investment_id: lot.id,
+                sold_date: soldDate,
+                cost_basis: Math.round(take * 100) / 100,
+                proceeds: Math.round(take * 100) / 100
+            });
+            left -= take;
+        }
+        if (saleRows.length) {
+            const costSum = saleRows.reduce((s, r) => s + r.cost_basis, 0);
+            const diff = Math.round((amount - costSum) * 100) / 100;
+            saleRows[saleRows.length - 1].cost_basis = Math.round((saleRows[saleRows.length - 1].cost_basis + diff) * 100) / 100;
+            saleRows[saleRows.length - 1].proceeds = saleRows[saleRows.length - 1].cost_basis;
+        }
+        return saleRows;
+    };
+    const consumeCash = async (userId, amount, soldDate) => {
+        const saleRows = buildFifoCashSaleRows(userId, amount, soldDate);
+        if (!saleRows.length) return;
+        const { error } = await db.from('investment_sales').insert(saleRows);
+        if (error) throw error;
+    };
+    const typeSortIndex = (typeName) => {
+        const idx = allAssetTypes.findIndex(t => t.name === typeName);
+        return idx === -1 ? 9999 : idx;
+    };
 
     // --- ASSET TYPES ---
     const fetchAssetTypes = async () => {
@@ -647,6 +810,7 @@
 
         if (namesToSeed.length === 0) {
             populateTypeSelects();
+            updateCashBalanceHint();
             return;
         }
 
@@ -659,6 +823,7 @@
         if (error) throw error;
         await fetchAssetTypes();
         populateTypeSelects();
+        updateCashBalanceHint();
     };
 
     const populateTypeSelects = (selectedAdd = null, selectedEdit = null) => {
@@ -683,11 +848,13 @@
             assetTypesListEl.innerHTML = '<p class="form-info" style="text-align:center;">ยังไม่มีประเภทสินทรัพย์</p>';
             return;
         }
-        assetTypesListEl.innerHTML = allAssetTypes.map(t => {
+        assetTypesListEl.innerHTML = allAssetTypes.map((t, index) => {
             const inUse = allInvestments.some(inv => inv.asset_type === t.name);
             return `<div class="asset-type-item" data-id="${t.id}">
                 <span class="asset-type-item-name">${escapeHtml(t.name)}${inUse ? ' <span class="form-info">(มีรายการ)</span>' : ''}</span>
                 <div class="asset-type-item-actions">
+                    <button type="button" class="btn-small-secondary" data-action="up" data-id="${t.id}" ${index === 0 ? 'disabled' : ''} title="เลื่อนขึ้น">▲</button>
+                    <button type="button" class="btn-small-secondary" data-action="down" data-id="${t.id}" ${index === allAssetTypes.length - 1 ? 'disabled' : ''} title="เลื่อนลง">▼</button>
                     <button type="button" class="btn-small-secondary" data-action="rename" data-id="${t.id}" data-name="${escapeHtml(t.name)}">เปลี่ยนชื่อ</button>
                     <button type="button" class="btn-small-danger" data-action="delete" data-id="${t.id}" data-name="${escapeHtml(t.name)}">ลบ</button>
                 </div>
@@ -775,6 +942,218 @@
         }
     };
 
+    const moveAssetType = async (id, direction) => {
+        const idx = allAssetTypes.findIndex(t => t.id === id);
+        const swapIdx = idx + direction;
+        if (idx < 0 || swapIdx < 0 || swapIdx >= allAssetTypes.length) return;
+        const reordered = [...allAssetTypes];
+        const [item] = reordered.splice(idx, 1);
+        reordered.splice(swapIdx, 0, item);
+        try {
+            const updates = reordered.map((t, i) =>
+                db.from('asset_types').update({ sort_order: i }).eq('id', t.id)
+            );
+            const results = await Promise.all(updates);
+            const firstError = results.find(r => r.error)?.error;
+            if (firstError) throw firstError;
+            await fetchAssetTypes();
+            populateTypeSelects();
+            renderAssetTypesList();
+            renderUI();
+        } catch (error) {
+            alert('เกิดข้อผิดพลาด: ' + error.message);
+        }
+    };
+
+    const getOpenHoldings = () => {
+        const map = new Map();
+        allInvestments.filter(inv => !isCashInvestment(inv)).forEach(inv => {
+            const remCost = remainingCost(inv);
+            if (remCost <= 0.00001) return;
+            const key = holdingKey(inv);
+            if (!map.has(key)) {
+                map.set(key, {
+                    key,
+                    asset_type: inv.asset_type,
+                    asset_name: inv.asset_name,
+                    remainingCost: 0,
+                    remainingValue: 0
+                });
+            }
+            const row = map.get(key);
+            row.remainingCost += remCost;
+            row.remainingValue += remainingValue(inv);
+        });
+        return [...map.values()].sort((a, b) =>
+            a.asset_type.localeCompare(b.asset_type, 'th') || a.asset_name.localeCompare(b.asset_name, 'th')
+        );
+    };
+
+    const updateSellHoldingInfo = () => {
+        const key = sellHoldingEl.value;
+        if (!key) {
+            sellHoldingInfoEl.value = '';
+            sellCostEl.value = '';
+            sellProceedsEl.value = '';
+            return;
+        }
+        const holding = getOpenHoldings().find(h => h.key === key);
+        if (!holding) {
+            sellHoldingInfoEl.value = '';
+            return;
+        }
+        sellHoldingInfoEl.value = `ต้นทุน ฿${formatMoney(holding.remainingCost)} | มูลค่า ฿${formatMoney(holding.remainingValue)}`;
+        sellCostEl.value = holding.remainingCost.toFixed(2);
+        sellCostEl.max = holding.remainingCost.toFixed(2);
+        sellProceedsEl.value = holding.remainingValue.toFixed(2);
+    };
+
+    const openSellModal = (preselectKey = null) => {
+        const holdings = getOpenHoldings();
+        if (!holdings.length) {
+            alert('ไม่มีสินทรัพย์ที่ถืออยู่ให้ขาย');
+            return;
+        }
+        sellHoldingEl.innerHTML = holdings.map(h =>
+            `<option value="${escapeHtml(h.key)}">${escapeHtml(h.asset_type)} — ${escapeHtml(h.asset_name)}</option>`
+        ).join('');
+        if (preselectKey && holdings.some(h => h.key === preselectKey)) sellHoldingEl.value = preselectKey;
+        sellDateEl.valueAsDate = new Date();
+        sellKeepCashEl.checked = true;
+        updateSellHoldingInfo();
+        sellModalContainer.classList.remove('hidden');
+    };
+
+    window.openSellModalForHolding = (assetType, assetName) => {
+        openSellModal(`${assetType}|||${assetName}`);
+    };
+
+    const ensureCashAssetType = async (userId) => {
+        const exists = allAssetTypes.some(t => t.name === CASH_ASSET_TYPE);
+        if (exists) return;
+        const { error } = await db.from('asset_types').insert({
+            user_id: userId,
+            name: CASH_ASSET_TYPE,
+            sort_order: allAssetTypes.length
+        });
+        if (error && !String(error.message || '').includes('duplicate')) throw error;
+        await fetchAssetTypes();
+        populateTypeSelects();
+    };
+
+    const handleSell = async (e) => {
+        e.preventDefault();
+        const key = sellHoldingEl.value;
+        const costToSell = parseFloat(sellCostEl.value);
+        const proceeds = parseFloat(sellProceedsEl.value);
+        const soldDate = sellDateEl.value;
+        if (!key || !soldDate || !(costToSell > 0) || isNaN(proceeds) || proceeds < 0) {
+            alert('กรุณากรอกข้อมูลการขายให้ครบถ้วน');
+            return;
+        }
+        const { asset_type, asset_name } = parseHoldingKey(key);
+        const lots = allInvestments
+            .filter(inv => inv.asset_type === asset_type && inv.asset_name === asset_name && remainingCost(inv) > 0.00001)
+            .sort((a, b) => new Date(a.investment_date) - new Date(b.investment_date) || a.id - b.id);
+        const totalRemaining = lots.reduce((sum, inv) => sum + remainingCost(inv), 0);
+        if (costToSell > totalRemaining + 0.01) {
+            alert(`ขายได้ไม่เกินต้นทุนคงเหลือ ฿${formatMoney(totalRemaining)}`);
+            return;
+        }
+
+        try {
+            const { data: { user } } = await db.auth.getUser();
+            let left = costToSell;
+            const saleRows = [];
+            for (const lot of lots) {
+                if (left <= 0.00001) break;
+                const rem = remainingCost(lot);
+                const take = Math.min(rem, left);
+                const lotProceeds = costToSell > 0 ? proceeds * (take / costToSell) : 0;
+                saleRows.push({
+                    user_id: user.id,
+                    investment_id: lot.id,
+                    sold_date: soldDate,
+                    cost_basis: Math.round(take * 100) / 100,
+                    proceeds: Math.round(lotProceeds * 100) / 100
+                });
+                left -= take;
+            }
+            // Fix rounding so sum cost matches and sum proceeds matches
+            if (saleRows.length) {
+                const costSum = saleRows.reduce((s, r) => s + r.cost_basis, 0);
+                const procSum = saleRows.reduce((s, r) => s + r.proceeds, 0);
+                saleRows[saleRows.length - 1].cost_basis = Math.round((saleRows[saleRows.length - 1].cost_basis + (costToSell - costSum)) * 100) / 100;
+                saleRows[saleRows.length - 1].proceeds = Math.round((saleRows[saleRows.length - 1].proceeds + (proceeds - procSum)) * 100) / 100;
+            }
+
+            const { error: saleError } = await db.from('investment_sales').insert(saleRows);
+            if (saleError) throw saleError;
+
+            if (sellKeepCashEl.checked && proceeds > 0) {
+                await ensureCashAssetType(user.id);
+                const { error: cashError } = await db.from('investments').insert({
+                    user_id: user.id,
+                    asset_type: CASH_ASSET_TYPE,
+                    asset_name: CASH_ASSET_NAME,
+                    amount: proceeds,
+                    current_value: proceeds,
+                    investment_date: soldDate
+                });
+                if (cashError) throw cashError;
+            }
+
+            sellModalContainer.classList.add('hidden');
+            await fetchAllInvestments();
+            alert('บันทึกการขายแบบ FIFO เรียบร้อย');
+        } catch (error) {
+            alert('เกิดข้อผิดพลาด: ' + error.message);
+        }
+    };
+
+    const openSpendCashModal = () => {
+        const bal = getCashBalance();
+        if (bal <= 0) {
+            alert('ยังไม่มีเงินสดในพอร์ต');
+            return;
+        }
+        document.getElementById('spend-cash-balance').value = `฿${formatMoney(bal)}`;
+        document.getElementById('spend-cash-amount').value = '';
+        document.getElementById('spend-cash-amount').max = bal.toFixed(2);
+        document.getElementById('spend-cash-date').valueAsDate = new Date();
+        document.getElementById('spend-cash-note').value = '';
+        spendCashModal.classList.remove('hidden');
+    };
+
+    const handleSpendCash = async (e) => {
+        e.preventDefault();
+        const amount = parseFloat(document.getElementById('spend-cash-amount').value);
+        const spendDate = document.getElementById('spend-cash-date').value;
+        const note = document.getElementById('spend-cash-note').value.trim();
+        if (!(amount > 0) || !spendDate) {
+            alert('กรุณากรอกข้อมูลให้ครบ');
+            return;
+        }
+        const bal = getCashBalance();
+        if (amount > bal + 0.01) {
+            alert(`ถอนได้ไม่เกิน ฿${formatMoney(bal)}`);
+            return;
+        }
+        const confirmMsg = note
+            ? `ถอนเงินสด ฿${formatMoney(amount)}\nหมายเหตุ: ${note}`
+            : `ถอนเงินสด ฿${formatMoney(amount)} ออกจากพอร์ต?`;
+        if (!confirm(confirmMsg)) return;
+        try {
+            const { data: { user } } = await db.auth.getUser();
+            await consumeCash(user.id, amount, spendDate);
+            spendCashModal.classList.add('hidden');
+            await fetchAllInvestments();
+            alert('ถอนเงินสดเรียบร้อย');
+        } catch (error) {
+            alert('เกิดข้อผิดพลาด: ' + error.message);
+        }
+    };
+
     // --- MAIN APP LOGIC ---
     const handleLogin = async (e) => { e.preventDefault(); const email = document.getElementById('login-email').value; const password = document.getElementById('login-password').value; const { error } = await db.auth.signInWithPassword({ email, password }); if (error) alert(error.message); };
     const handleLogout = async () => { const { error } = await db.auth.signOut(); if (error) console.error("Logout Error:", error); };
@@ -784,14 +1163,80 @@
         const { data, error } = await db.from('investments').select('*').order('investment_date', { ascending: false }); 
         if (error) throw error; 
         allInvestments = data; 
+        const { data: sales, error: salesErr } = await db.from('investment_sales').select('*').eq('user_id', user.id);
+        if (salesErr) throw salesErr;
+        allSales = sales || [];
         const { data: snaps, error: err2 } = await db.from('yearly_snapshots').select('*').eq('user_id', user.id);
         if (!err2) yearlySnapshots = snaps;
         populateAssetNameDatalist(allInvestments); 
+        updateCashBalanceHint();
         renderUI(); 
     } catch (error) { console.error('Error:', error); } 
 };
-    const addInvestment = async (e) => { e.preventDefault(); try { const { data: { user } } = await db.auth.getUser(); const amount = +document.getElementById('amount').value; const newInvestment = { user_id: user.id, asset_type: document.getElementById('asset_type').value, asset_name: document.getElementById('asset_name').value, amount, current_value: amount, investment_date: investmentDateEl.value }; const { error } = await db.from('investments').insert(newInvestment); if (error) throw error; await fetchAllInvestments(); document.getElementById('investment-form').reset(); investmentDateEl.valueAsDate = new Date(); } catch (error) { console.error('Error adding investment:', error); alert('เกิดข้อผิดพลาด: ' + error.message); } };
-    const removeInvestment = async (id) => { if (!confirm('คุณแน่ใจว่าต้องการลบรายการนี้?')) return; try { const { error } = await db.from('investments').delete().eq('id', id); if (error) throw error; await fetchAllInvestments(); } catch (error) { console.error('Error deleting investment:', error); alert('เกิดข้อผิดพลาด: ' + error.message); } };
+    const addInvestment = async (e) => {
+        e.preventDefault();
+        try {
+            const { data: { user } } = await db.auth.getUser();
+            const amount = +document.getElementById('amount').value;
+            const assetType = document.getElementById('asset_type').value;
+            const assetName = document.getElementById('asset_name').value;
+            const investmentDate = investmentDateEl.value;
+            const useCash = useCashCheckbox.checked;
+
+            if (!(amount > 0)) { alert('กรุณากรอกจำนวนเงินที่ถูกต้อง'); return; }
+            if (useCash && assetType === CASH_ASSET_TYPE) {
+                alert('ไม่สามารถใช้เงินสดซื้อประเภทเงินสดได้');
+                return;
+            }
+            if (useCash) {
+                const bal = getCashBalance();
+                if (amount > bal + 0.01) {
+                    alert(`เงินสดไม่พอ (คงเหลือ ฿${formatMoney(bal)})`);
+                    return;
+                }
+            }
+
+            const newInvestment = {
+                user_id: user.id,
+                asset_type: assetType,
+                asset_name: assetName,
+                amount,
+                current_value: amount,
+                investment_date: investmentDate,
+                funded_from_cash: useCash
+            };
+            const { error } = await db.from('investments').insert(newInvestment);
+            if (error) throw error;
+
+            if (useCash) {
+                await consumeCash(user.id, amount, investmentDate);
+            }
+
+            await fetchAllInvestments();
+            document.getElementById('investment-form').reset();
+            investmentDateEl.valueAsDate = new Date();
+            populateTypeSelects();
+            updateCashBalanceHint();
+        } catch (error) {
+            console.error('Error adding investment:', error);
+            alert('เกิดข้อผิดพลาด: ' + error.message);
+        }
+    };
+    const removeInvestment = async (id) => {
+        const hasSales = allSales.some(s => Number(s.investment_id) === Number(id));
+        const msg = hasSales
+            ? 'รายการนี้มีประวัติการขาย — การลบจะลบประวัติขายด้วยและอาจกระทบวิเคราะห์รายปี ต้องการลบจริงหรือไม่?\n\nแนะนำให้ใช้ปุ่มขาย (FIFO) แทน'
+            : 'คุณแน่ใจว่าต้องการลบรายการนี้?\n\nถ้าเป็นการขาย แนะนำใช้ปุ่มขาย (FIFO) เพื่อไม่ให้มูลค่าสิ้นปีที่ล็อกไว้เพี้ยน';
+        if (!confirm(msg)) return;
+        try {
+            const { error } = await db.from('investments').delete().eq('id', id);
+            if (error) throw error;
+            await fetchAllInvestments();
+        } catch (error) {
+            console.error('Error deleting investment:', error);
+            alert('เกิดข้อผิดพลาด: ' + error.message);
+        }
+    };
     
     const handleEditInvestment = async (e) => {
         e.preventDefault();
@@ -836,9 +1281,9 @@
     };
 
     window.openUpdateValueModal = (assetType) => {
-        const investmentsForType = allInvestments.filter(inv => inv.asset_type === assetType);
-        const totalInvestment = investmentsForType.reduce((sum, inv) => sum + inv.amount, 0);
-        const currentTotalValue = investmentsForType.reduce((sum, inv) => sum + inv.current_value, 0);
+        const investmentsForType = allInvestments.filter(inv => inv.asset_type === assetType && remainingCost(inv) > 0.00001);
+        const totalInvestment = investmentsForType.reduce((sum, inv) => sum + remainingCost(inv), 0);
+        const currentTotalValue = investmentsForType.reduce((sum, inv) => sum + remainingValue(inv), 0);
         document.getElementById('update-value-title').innerText = `อัปเดตมูลค่ารวม: ${assetType}`;
         document.getElementById('update-asset-type').value = assetType;
         document.getElementById('update-total-investment').value = formatMoney(totalInvestment);
@@ -852,18 +1297,17 @@
         const assetType = document.getElementById('update-asset-type').value;
         const newTotalValue = parseFloat(document.getElementById('new-total-value').value);
         if (isNaN(newTotalValue) || newTotalValue < 0) { alert('กรุณากรอกมูลค่าที่ถูกต้อง'); return; }
-        const investmentsForType = allInvestments.filter(inv => inv.asset_type === assetType);
-        const totalInvestment = investmentsForType.reduce((sum, inv) => sum + inv.amount, 0);
+        const investmentsForType = allInvestments.filter(inv => inv.asset_type === assetType && remainingCost(inv) > 0.00001);
+        const totalRemainingCost = investmentsForType.reduce((sum, inv) => sum + remainingCost(inv), 0);
         let updatePromises;
-        if (totalInvestment > 0) {
+        if (totalRemainingCost > 0) {
             updatePromises = investmentsForType.map(inv => {
-                const proportion = inv.amount / totalInvestment;
-                const newProRatedValue = newTotalValue * proportion;
-                return db.from('investments').update({ current_value: newProRatedValue }).eq('id', inv.id);
+                const rem = remainingCost(inv);
+                const targetRemainingValue = newTotalValue * (rem / totalRemainingCost);
+                const orig = Number(inv.amount);
+                const newCurrentValue = rem > 0 ? targetRemainingValue * (orig / rem) : 0;
+                return db.from('investments').update({ current_value: newCurrentValue }).eq('id', inv.id);
             });
-        } else if (investmentsForType.length > 0) {
-            const equalValue = newTotalValue / investmentsForType.length;
-            updatePromises = investmentsForType.map(inv => db.from('investments').update({ current_value: equalValue }).eq('id', inv.id));
         } else { return; }
         const results = await Promise.all(updatePromises);
         const firstError = results.find(res => res.error)?.error;
@@ -881,8 +1325,10 @@
         const isAuxiliaryView = view === 'analysis' || view === 'retirement';
         addInvestmentSection.classList.toggle('hidden', isAuxiliaryView);
         if (view === 'retirement') {
-            const totalCurrentValue = allInvestments.reduce((acc, t) => acc + t.current_value, 0);
-            retirementInitialInvestmentEl.value = formatNumberInput(totalCurrentValue.toFixed(0));
+            const openNonCash = allInvestments.filter(inv => !isCashInvestment(inv) && remainingCost(inv) > 0);
+            const cashValue = allInvestments.filter(isCashInvestment).reduce((acc, t) => acc + remainingValue(t), 0);
+            const securitiesValue = openNonCash.reduce((acc, t) => acc + remainingValue(t), 0);
+            retirementInitialInvestmentEl.value = formatNumberInput((securitiesValue + cashValue).toFixed(0));
         }
         renderUI();
     };
@@ -908,7 +1354,7 @@
     const renderUI = () => {
         const selectedMonth = filterMonthEl.value;
         const selectedYear = filterYearEl.value;
-        let filteredInvestments = allInvestments;
+        let filteredInvestments = allInvestments.filter(inv => remainingCost(inv) > 0.00001);
         if (currentView === 'summary') {
             if (selectedYear !== 'all') filteredInvestments = filteredInvestments.filter(inv => new Date(inv.investment_date).getFullYear() == selectedYear);
             if (selectedMonth !== 'all') filteredInvestments = filteredInvestments.filter(inv => (new Date(inv.investment_date).getMonth() + 1) == selectedMonth);
@@ -919,8 +1365,11 @@
     };
 
     const updateDashboard = (investments) => {
-        const totalInvestment = investments.reduce((acc, t) => acc + t.amount, 0);
-        const currentValue = investments.reduce((acc, t) => acc + t.current_value, 0);
+        const openLots = investments.filter(inv => remainingCost(inv) > 0.00001);
+        const totalInvestment = openLots.filter(inv => !isCashInvestment(inv)).reduce((acc, t) => acc + remainingCost(t), 0);
+        const securitiesValue = openLots.filter(inv => !isCashInvestment(inv)).reduce((acc, t) => acc + remainingValue(t), 0);
+        const cashValue = openLots.filter(isCashInvestment).reduce((acc, t) => acc + remainingValue(t), 0);
+        const currentValue = securitiesValue + cashValue;
         const profitLoss = currentValue - totalInvestment;
         const profitLossPercent = totalInvestment > 0 ? (profitLoss / totalInvestment) * 100 : 0;
         document.getElementById('total-investment').innerHTML = `฿${formatAbbreviatedMoney(totalInvestment)}`;
@@ -942,44 +1391,58 @@
             tableEl.innerHTML = `<thead><tr><th>ประเภทสินทรัพย์</th><th>เงินลงทุน</th><th>มูลค่าปัจจุบัน</th><th>กำไร/ขาดทุน</th><th>% กำไร/ขาดทุน</th><th>จัดการ</th></tr></thead><tbody><tr><td colspan="6" style="text-align:center; padding: 20px;">ไม่พบรายการลงทุนในเดือน/ปีที่เลือก</td></tr></tbody>`;
             return;
         }
-        const summaryData = investments.reduce((acc, t) => { 
-            if (!acc[t.asset_type]) { acc[t.asset_type] = { investment: 0, currentValue: 0, items: [] }; } 
-            acc[t.asset_type].investment += t.amount; acc[t.asset_type].currentValue += t.current_value; acc[t.asset_type].items.push(t);
-            return acc; 
+        const summaryData = investments.reduce((acc, t) => {
+            const remCost = remainingCost(t);
+            const remValue = remainingValue(t);
+            if (remCost <= 0.00001 && remValue <= 0.00001) return acc;
+            if (!acc[t.asset_type]) { acc[t.asset_type] = { investment: 0, currentValue: 0, items: [] }; }
+            acc[t.asset_type].investment += remCost;
+            acc[t.asset_type].currentValue += remValue;
+            acc[t.asset_type].items.push(t);
+            return acc;
         }, {});
         let tableHTML = `<thead><tr><th>ประเภทสินทรัพย์</th><th>เงินลงทุน</th><th>มูลค่าปัจจุบัน</th><th>กำไร/ขาดทุน</th><th>% กำไร/ขาดทุน</th><th>จัดการ</th></tr></thead><tbody>`;
-        Object.keys(summaryData).sort().forEach(type => {
+        Object.keys(summaryData).sort((a, b) => {
+            const d = typeSortIndex(a) - typeSortIndex(b);
+            return d !== 0 ? d : a.localeCompare(b, 'th');
+        }).forEach(type => {
             const data = summaryData[type];
             const profitLoss = data.currentValue - data.investment;
             const percent = data.investment > 0 ? (profitLoss / data.investment) * 100 : 0;
             const typeId = type.replace(/\s/g, '-');
-            tableHTML += `<tr class="summary-row" onclick="toggleDetails('${type}')">
-                <td data-label="ประเภท">${type} <button class="btn-small btn-mobile-only" onclick="event.stopPropagation(); openUpdateValueModal('${type}')">อัปเดต</button></td>
+            const escapedType = type.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            tableHTML += `<tr class="summary-row" onclick="toggleDetails('${escapedType}')">
+                <td data-label="ประเภท">${escapeHtml(type)} <button class="btn-small btn-mobile-only" onclick="event.stopPropagation(); openUpdateValueModal('${escapedType}')">อัปเดต</button></td>
                 <td data-label="เงินลงทุน">${formatAbbreviatedMoney(data.investment)}</td>
                 <td data-label="มูลค่าปัจจุบัน">${formatAbbreviatedMoney(data.currentValue)}</td>
                 <td data-label="กำไร/ขาดทุน" class="${profitLoss >= 0 ? 'positive' : 'negative'}">${formatAbbreviatedMoney(profitLoss)}</td>
                 <td data-label="% กำไร/ขาดทุน" class="${percent >= 0 ? 'positive' : 'negative'}">${percent.toFixed(2)}%</td>
                 <td data-label="จัดการ" class="desktop-only-cell">
-                    <button class="btn-small btn-secondary" onclick="event.stopPropagation(); openUpdateValueModal('${type}')">อัปเดตมูลค่ารวม</button>
+                    <button class="btn-small btn-secondary" onclick="event.stopPropagation(); openUpdateValueModal('${escapedType}')">อัปเดตมูลค่ารวม</button>
                 </td>
             </tr>`;
             tableHTML += `<tr id="details-for-${typeId}" class="details-row hidden"><td colspan="6" class="details-content">`;
             if (data.items.length > 0) {
                  data.items.sort((a,b) => new Date(b.investment_date) - new Date(a.investment_date)).forEach(t => {
-                    const itemProfitLoss = t.current_value - t.amount;
+                    const remCost = remainingCost(t);
+                    const remValue = remainingValue(t);
+                    const itemProfitLoss = remValue - remCost;
                     const itemClass = itemProfitLoss >= 0 ? 'positive' : 'negative';
                     const formattedDate = new Date(t.investment_date).toLocaleDateString('th-TH', { day: 'numeric', month: 'short', year: '2-digit', timeZone: 'UTC' });
+                    const soldHint = remCost < Number(t.amount) - 0.00001 ? ` · เหลือต้นทุน ฿${formatMoney(remCost)}` : '';
+                    const escapedName = t.asset_name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
                     tableHTML += `<div class="investment-item">
                         <div style="flex-direction: column; gap: 4px; text-align: left; word-break: break-all;">
-                            <span style="font-weight: 500;">${t.asset_name}</span>
-                            <span style="font-size: 0.85rem; color: #666;">ลงทุน: ฿${formatMoney(t.amount)} (${formattedDate})</span>
+                            <span style="font-weight: 500;">${escapeHtml(t.asset_name)}</span>
+                            <span style="font-size: 0.85rem; color: #666;">ลงทุน: ฿${formatMoney(t.amount)} (${formattedDate})${soldHint}</span>
                         </div>
                         <div class="investment-item-actions">
                             <span class="${itemClass}" style="font-weight: 600; font-size: 0.9rem; text-align: right;">
-                                ฿${formatMoney(t.current_value)}
+                                ฿${formatMoney(remValue)}
                                 <span style="font-size: 0.8rem; font-weight: 500;">(${itemProfitLoss >= 0 ? '+' : ''}${formatMoney(itemProfitLoss)})</span>
                             </span>
                             <div class="investment-item-buttons">
+                                ${isCashInvestment(t) ? '' : `<button class="btn-small-secondary" onclick="event.stopPropagation(); openSellModalForHolding('${escapedType}', '${escapedName}')">ขาย</button>`}
                                 <button class="btn-small-secondary" onclick="event.stopPropagation(); openEditModal(${t.id})">แก้ไข</button>
                                 <button class="btn-small-danger" onclick="event.stopPropagation(); removeInvestment(${t.id})">ลบ</button>
                             </div>
@@ -1000,14 +1463,34 @@
         const lastYear = new Date().getFullYear();
         let yearlyData = {}; let lastYearPortfolioValue = 0;
         for (let year = firstYear; year <= lastYear; year++) {
-            const investmentsInYear = sortedInvestments.filter(t => new Date(t.investment_date).getFullYear() === year);
-            const investmentsUpToYear = sortedInvestments.filter(t => new Date(t.investment_date).getFullYear() <= year);
-            const newInvestment = investmentsInYear.reduce((sum, t) => sum + t.amount, 0);
-            const totalInvestment = investmentsUpToYear.reduce((sum, t) => sum + t.amount, 0);
+            const yearEnd = toYearEndDate(year);
+            const buysInYear = sortedInvestments.filter(t =>
+                !isCashInvestment(t) && !t.funded_from_cash && new Date(t.investment_date).getFullYear() === year
+            );
+            const newInvestment = buysInYear.reduce((sum, t) => sum + Number(t.amount), 0);
+
+            const heldNonCash = sortedInvestments.filter(t =>
+                !isCashInvestment(t) && t.investment_date <= yearEnd && remainingCost(t, yearEnd) > 0.00001
+            );
+            const heldCash = sortedInvestments.filter(t =>
+                isCashInvestment(t) && t.investment_date <= yearEnd && remainingCost(t, yearEnd) > 0.00001
+            );
+            const computedTotalInvestment = heldNonCash.reduce((sum, t) => sum + remainingCost(t, yearEnd), 0);
+            const computedPortfolioValue =
+                heldNonCash.reduce((sum, t) => sum + remainingValue(t, yearEnd), 0) +
+                heldCash.reduce((sum, t) => sum + remainingValue(t, yearEnd), 0);
+
             const snapshot = yearlySnapshots.find(s => s.year === year);
-            let portfolioValue; let isLocked = false;
-            if (snapshot) { portfolioValue = snapshot.portfolio_value; isLocked = true; } 
-            else portfolioValue = investmentsUpToYear.reduce((sum, t) => sum + t.current_value, 0);
+            let portfolioValue; let totalInvestment; let isLocked = false;
+            if (snapshot) {
+                portfolioValue = Number(snapshot.portfolio_value);
+                totalInvestment = snapshot.total_investment != null ? Number(snapshot.total_investment) : computedTotalInvestment;
+                isLocked = true;
+            } else {
+                portfolioValue = computedPortfolioValue;
+                totalInvestment = computedTotalInvestment;
+            }
+
             const totalGainLoss = portfolioValue - totalInvestment;
             const annualGainLoss = (portfolioValue - lastYearPortfolioValue) - newInvestment;
             const beginningOfYearValue = lastYearPortfolioValue + newInvestment;
@@ -1118,13 +1601,34 @@
     newAssetTypeNameEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addAssetType(); } });
     assetTypesListEl.addEventListener('click', (e) => {
         const btn = e.target.closest('button[data-action]');
-        if (!btn) return;
+        if (!btn || btn.disabled) return;
         const { action, id, name } = btn.dataset;
         if (action === 'rename') renameAssetType(id, name);
         else if (action === 'delete') deleteAssetType(id, name);
+        else if (action === 'up') moveAssetType(id, -1);
+        else if (action === 'down') moveAssetType(id, 1);
     });
     manageAssetTypesModal.addEventListener('click', (e) => {
         if (e.target === manageAssetTypesModal) closeManageAssetTypesModal();
+    });
+    document.getElementById('open-sell-modal-btn').addEventListener('click', () => openSellModal());
+    document.getElementById('open-spend-cash-btn').addEventListener('click', openSpendCashModal);
+    document.getElementById('close-sell-modal-btn').addEventListener('click', () => sellModalContainer.classList.add('hidden'));
+    document.getElementById('close-spend-cash-btn').addEventListener('click', () => spendCashModal.classList.add('hidden'));
+    document.getElementById('sell-form').addEventListener('submit', handleSell);
+    document.getElementById('spend-cash-form').addEventListener('submit', handleSpendCash);
+    sellHoldingEl.addEventListener('change', updateSellHoldingInfo);
+    sellModalContainer.addEventListener('click', (e) => {
+        if (e.target === sellModalContainer) sellModalContainer.classList.add('hidden');
+    });
+    spendCashModal.addEventListener('click', (e) => {
+        if (e.target === spendCashModal) spendCashModal.classList.add('hidden');
+    });
+    useCashCheckbox.addEventListener('change', () => {
+        if (useCashCheckbox.checked && getCashBalance() <= 0) {
+            useCashCheckbox.checked = false;
+            alert('ยังไม่มีเงินสดในพอร์ต — ขายสินทรัพย์และเลือกถือเป็นเงินสดก่อน');
+        }
     });
     retirementForm.addEventListener('submit', calculateRetirement);
     retirementResetButton.addEventListener('click', resetAllData);
