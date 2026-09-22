@@ -254,9 +254,39 @@
         #retirement-view .results p { font-size: 1.1rem; line-height: 1.6; margin: 10px 0; }
         #retirement-view .results span { font-weight: bold; color: #1d4ed8; }
         #retirement-view .error { color: var(--danger-color); text-align: center; margin-top: 15px; min-height: 1.2em; }
+        #retirement-view .yearly-projection { margin-top: 25px; }
+        #retirement-view .yearly-projection h3 { color: var(--primary-color); }
+        #retirement-view .yearly-projection p { font-size: 0.9rem; color: #4b5563; }
+        #retirement-view .yearly-projection .table-container {
+            max-height: 70vh;
+            max-height: 70dvh;
+            overflow: auto;
+        }
+        #retirement-yearly-table { background: white; font-variant-numeric: tabular-nums; border-collapse: separate; border-spacing: 0; }
+        #retirement-yearly-table thead th {
+            position: sticky;
+            top: 0;
+            z-index: 1;
+            background: white;
+            box-shadow: 0 1px 0 #dee2e6;
+        }
+        #retirement-view .yearly-projection details { margin: 8px 0 12px; font-size: 0.85rem; color: #4b5563; }
+        #retirement-view .yearly-projection summary { cursor: pointer; }
+        #retirement-yearly-table th, #retirement-yearly-table td { border-bottom: 1px solid #dee2e6; }
+        #retirement-yearly-table .retirement-milestone { background: #dbeafe; font-weight: 600; }
+        #retirement-yearly-table td:last-child { color: #1d4ed8; font-weight: 600; }
         
         /* --- MOBILE RESPONSIVE STYLES --- */
         @media (max-width: 768px) {
+            #retirement-view .results { padding: 10px; }
+            #retirement-yearly-table { table-layout: auto; font-size: 0.75rem; }
+            #retirement-yearly-table thead { display: table-header-group; }
+            #retirement-yearly-table tr { display: table-row; border: none; box-shadow: none; }
+            #retirement-yearly-table th, #retirement-yearly-table td {
+                display: table-cell; padding: 9px 6px; white-space: nowrap; text-align: right !important;
+            }
+            #retirement-yearly-table th:first-child, #retirement-yearly-table td:first-child { text-align: left !important; width: 12%; }
+            #retirement-yearly-table td::before { display: none; }
             body { padding: 1rem 0; }
             .container { padding: 8px; }
             .section { padding: 15px; }
@@ -439,11 +469,25 @@
                     </form>
                     <div id="results" class="results hidden">
                         <h2>สรุปผลการคำนวณ</h2>
-                        <p>คุณจะลงทุนเป็นเวลา <span id="yearsToInvest"></span> ปี</p>
+                        <p>คุณจะลงทุนเป็นเวลา <span id="yearsToInvest"></span></p>
                         <p>เงินที่จะมี ณ วันเกษียณอายุ <span id="ageAtRetirement"></span> ปี: <span id="retirementTotal"></span></p>
                         <hr>
                         <p>คุณจะมีเงินใช้หลังเกษียณไปอีก <span id="yearsInRetirement"></span> ปี</p>
                         <p>เงินที่ใช้ได้ต่อเดือนจนถึงอายุ <span id="ageAtEnd"></span> ปี: <span id="monthlyWithdrawal"></span></p>
+                        <div class="yearly-projection">
+                            <h3 id="retirement-yearly-title">ยอดรายปี</h3>
+                            <p>หน่วย: บาท · สีฟ้า = ปีเกษียณ</p>
+                            <p id="retirement-transition-note"></p>
+                            <details>
+                                <summary>วิธีคำนวณ / หน่วย</summary>
+                                <p id="retirement-yearly-note"></p>
+                                <p>แสดงยอดเต็มบาท ไม่แสดงทศนิยม คำนวณด้วยยอดจริงก่อนปัดเศษ</p>
+                                <p>คงเหลือ = ต้นงวด + ลงทุน + ผลตอบแทน − ถอน คิดผลตอบแทนรายเดือนในอัตราเดิม ลงทุน/ถอนปลายเดือน เริ่มถอนเดือนเกิดที่เกษียณ แถวสุดท้ายเป็นยอดสิ้นแผนก่อนเดือนเกิดที่ครบอายุสิ้นสุด</p>
+                            </details>
+                            <div class="table-container" tabindex="0" role="region" aria-labelledby="retirement-yearly-title">
+                                <table id="retirement-yearly-table" aria-labelledby="retirement-yearly-title"></table>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1523,6 +1567,7 @@
     
     function calculateRetirement(event) {
         event.preventDefault(); retirementErrorMessage.textContent = '';
+        retirementResultsDiv.classList.add('hidden');
         const initial = parseFloat(unformatNumberInput(retirementInitialInvestmentEl.value)) || 0;
         const monthly = parseFloat(unformatNumberInput(retirementMonthlyInvestmentEl.value)) || 0;
         const annualReturn = parseFloat(retirementAnnualReturnEl.value) || 0;
@@ -1534,29 +1579,75 @@
         let currentAge = today.getFullYear() - birthDate.getFullYear();
         const m = today.getMonth() - birthDate.getMonth();
         if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) currentAge--;
-        if (retirementAge <= currentAge) { retirementErrorMessage.textContent = 'อายุที่ต้องการเกษียณต้องมากกว่าอายุุุ-ปัจจุบัน'; return; }
-        const yearsToInvest = retirementAge - currentAge;
+        if (!Number.isFinite(birthDate.getTime()) || birthDate > today ||
+            ![initial, monthly, annualReturn, retirementAge, lifeExpectancy].every(Number.isFinite) ||
+            initial < 0 || monthly < 0 || annualReturn <= -100 || lifeExpectancy > 150) {
+            retirementErrorMessage.textContent = 'กรุณาตรวจสอบข้อมูล: เงินลงทุนต้องไม่ติดลบ ผลตอบแทนต้องมากกว่า -100% และอายุสิ้นสุดไม่เกิน 150 ปี'; return;
+        }
+        if (retirementAge <= currentAge) { retirementErrorMessage.textContent = 'อายุที่ต้องการเกษียณต้องมากกว่าอายุปัจจุบัน'; return; }
+        const retirementYear = birthDate.getFullYear() + retirementAge;
         const yearsInRetirement = lifeExpectancy - retirementAge;
         const monthlyReturn = annualReturn / 100 / 12;
-        const totalMonthsToInvest = yearsToInvest * 12;
+        const projectionStart = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+        const totalMonthsToInvest = (retirementYear - projectionStart.getFullYear()) * 12 + birthDate.getMonth() - projectionStart.getMonth();
         const totalMonthsInRetirement = yearsInRetirement * 12;
         const fvInitial = initial * Math.pow(1 + monthlyReturn, totalMonthsToInvest);
-        const fvMonthly = monthly * ((Math.pow(1 + monthlyReturn, totalMonthsToInvest) - 1) / monthlyReturn);
+        const fvMonthly = monthlyReturn === 0 ? monthly * totalMonthsToInvest : monthly * (Math.expm1(totalMonthsToInvest * Math.log1p(monthlyReturn)) / monthlyReturn);
         const totalNestEgg = fvInitial + fvMonthly;
         let monthlyWithdrawal = 0;
-        if (monthlyReturn > 0 && isFinite(totalNestEgg)) { monthlyWithdrawal = totalNestEgg * (monthlyReturn * Math.pow(1 + monthlyReturn, totalMonthsInRetirement)) / (Math.pow(1 + monthlyReturn, totalMonthsInRetirement) - 1); } 
+        if (monthlyReturn !== 0 && isFinite(totalNestEgg)) { monthlyWithdrawal = totalNestEgg * monthlyReturn / -Math.expm1(-totalMonthsInRetirement * Math.log1p(monthlyReturn)); }
         else if (isFinite(totalNestEgg) && totalMonthsInRetirement > 0) monthlyWithdrawal = totalNestEgg / totalMonthsInRetirement;
-        displayRetirementResults({ yearsToInvest, retirementAge, totalNestEgg, yearsInRetirement, lifeExpectancy, monthlyWithdrawal });
+        if (![totalNestEgg, monthlyWithdrawal].every(Number.isFinite)) {
+            retirementErrorMessage.textContent = 'ค่าที่กรอกทำให้ยอดเงินสูงเกินขอบเขตที่คำนวณได้ กรุณาลดค่าลง'; return;
+        }
+        const yearlyBalances = [];
+        let balance = initial;
+        const totalMonths = totalMonthsToInvest + totalMonthsInRetirement;
+        for (let month = 0; month < totalMonths; month++) {
+            const date = new Date(projectionStart.getFullYear(), projectionStart.getMonth() + month + 1, 0);
+            const year = date.getFullYear();
+            const investing = month < totalMonthsToInvest;
+            let row = yearlyBalances[yearlyBalances.length - 1];
+            if (!row || row.year !== year + 543) {
+                row = { year: year + 543, age: 0, stage: year === retirementYear ? 'ปีเกษียณ' : investing ? 'สะสมเงิน' : 'หลังเกษียณ',
+                    opening: balance, contribution: 0, returns: 0, withdrawal: 0, balance, months: 0, investmentMonths: 0, withdrawalMonths: 0 };
+                yearlyBalances.push(row);
+            }
+            row.returns += balance * monthlyReturn;
+            row.contribution += investing ? monthly : 0;
+            row.withdrawal += investing ? 0 : monthlyWithdrawal;
+            balance = balance * (1 + monthlyReturn) + (investing ? monthly : -monthlyWithdrawal);
+            row.balance = Math.abs(balance) < 0.000001 ? 0 : balance;
+            row.months++;
+            row.investmentMonths += investing ? 1 : 0;
+            row.withdrawalMonths += investing ? 0 : 1;
+            row.age = year - birthDate.getFullYear() - (date.getMonth() < birthDate.getMonth() ? 1 : 0);
+        }
+        displayRetirementResults({ totalMonthsToInvest, retirementAge, totalNestEgg, yearsInRetirement, lifeExpectancy, monthlyWithdrawal, yearlyBalances, initial, startMonth: projectionStart.getMonth() });
         saveRetirementDataToLocalStorage();
     }
     function displayRetirementResults(data) {
         const formatter = new Intl.NumberFormat('th-TH', { style: 'currency', currency: 'THB' });
-        retirementYearsToInvestSpan.textContent = data.yearsToInvest.toFixed(0);
+        retirementYearsToInvestSpan.textContent = `${Math.floor(data.totalMonthsToInvest / 12)} ปี ${data.totalMonthsToInvest % 12} เดือน`;
         retirementAgeAtRetirementSpan.textContent = data.retirementAge;
         retirementTotalSpan.textContent = formatter.format(data.totalNestEgg);
         retirementYearsInRetirementSpan.textContent = data.yearsInRetirement.toFixed(0);
         retirementAgeAtEndSpan.textContent = data.lifeExpectancy;
         retirementMonthlyWithdrawalSpan.textContent = formatter.format(data.monthlyWithdrawal);
+        const startMonthName = new Date(2000, data.startMonth, 1).toLocaleDateString('th-TH', { month: 'long' });
+        document.getElementById('retirement-yearly-note').textContent = `ตั้งต้น ${formatter.format(data.initial)} เริ่มคำนวณเดือนหน้า ปี ${data.yearlyBalances[0].year}: ${startMonthName}–ธันวาคม (${data.yearlyBalances[0].months} เดือน) ไม่นับเงินลงทุนและผลตอบแทนเดือนปัจจุบัน`;
+        const retirementRow = data.yearlyBalances.find(row => row.stage === 'ปีเกษียณ');
+        document.getElementById('retirement-transition-note').textContent = retirementRow
+            ? `ปี ${retirementRow.year}: ลงทุน ${retirementRow.investmentMonths} เดือน / ถอน ${retirementRow.withdrawalMonths} เดือน (เริ่มถอนเดือนเกิด)` : '';
+        const wholeBaht = value => value.toLocaleString('th-TH', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        const moneyCell = (label, value) => `<td data-label="${label}" title="${formatter.format(value)}" aria-label="${label} ${formatter.format(value)}">${wholeBaht(value)}</td>`;
+        document.getElementById('retirement-yearly-table').innerHTML = `
+            <thead><tr><th scope="col">ปี พ.ศ.</th><th scope="col">ต้นงวด</th><th scope="col">ลงทุน</th><th scope="col">ผลตอบแทน</th><th scope="col">ถอน</th><th scope="col">คงเหลือ</th></tr></thead>
+            <tbody>${data.yearlyBalances.map(row => `<tr class="${row.stage === 'ปีเกษียณ' ? 'retirement-milestone' : ''}">
+                <td data-label="ปี พ.ศ." aria-label="ปี ${row.year}${row.stage === 'ปีเกษียณ' ? ' เกษียณ' : ''}">${row.year}</td>
+                ${moneyCell('ต้นงวด', row.opening)}${moneyCell('ลงทุน', row.contribution)}
+                ${moneyCell('ผลตอบแทน', row.returns)}${moneyCell('ถอน', row.withdrawal)}${moneyCell('คงเหลือ', row.balance)}
+            </tr>`).join('')}</tbody>`;
         retirementResultsDiv.classList.remove('hidden');
     }
     function saveRetirementDataToLocalStorage() {
