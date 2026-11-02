@@ -49,6 +49,16 @@
             padding: 15px; 
         }
         .hidden { display: none !important; }
+        /* เชื่อม InvestPui */
+        .ip-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -10px 0 20px; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg-color); font-size: .9rem; color: #495057; }
+        .ip-bar .ip-status { flex: 1; min-width: 180px; }
+        .ip-bar .ip-status b { color: var(--primary-color); }
+        .ip-bar .ip-err { color: var(--danger-color); }
+        .ip-bar button { padding: 6px 14px; font-size: .9rem; }
+        .ip-map { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
+        .ip-map-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
+        .ip-map-row small { display: block; color: #6C757D; font-size: .8rem; }
+        .ip-map-row select { width: 100%; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 5px; font-family: inherit; }
 
         /* --- Button Base Styles --- */
         button {
@@ -399,6 +409,12 @@
                 <div class="card"><h3>กำไร/ขาดทุน</h3><p class="amount" id="profit-loss">฿0.00</p></div>
             </div>
 
+            <div class="ip-bar" id="ip-bar">
+                <span class="ip-status" id="ip-status">🔗 InvestPui · ยังไม่ได้อัปเดต</span>
+                <button type="button" class="btn-small btn-primary" id="ip-sync-btn">อัปเดตจากพอร์ต</button>
+                <button type="button" class="btn-small btn-light" id="ip-settings-btn">ตั้งค่า</button>
+            </div>
+
             <div class="view-toggle">
                 <button class="view-toggle-btn active" onclick="setView('summary')">สรุปตามประเภท</button>
                 <button class="view-toggle-btn" onclick="setView('analysis')">วิเคราะห์รายปี</button>
@@ -613,6 +629,26 @@
                     <button type="submit" class="btn-primary">ยืนยันการขาย</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <div id="ip-modal-container" class="modal-container hidden">
+        <div class="modal-content">
+            <h2 class="section-title">อัปเดตอัตโนมัติจาก InvestPui</h2>
+            <div class="form-group">
+                <label for="ip-url">ที่อยู่เว็บ InvestPui</label>
+                <input type="url" id="ip-url" placeholder="https://stock-invest-eight.vercel.app">
+            </div>
+            <p class="form-info" style="margin-bottom:10px">เลือกว่าแต่ละพอร์ตจะอัปเดตมูลค่าปัจจุบันของประเภทไหน (เงินลงทุนยังบันทึกเองเหมือนเดิม)</p>
+            <div class="ip-map" id="ip-map"><p class="form-info">กำลังโหลดรายชื่อพอร์ต…</p></div>
+            <div class="form-group" style="display:flex;gap:8px;align-items:center">
+                <input type="checkbox" id="ip-include-cash" style="width:auto">
+                <label for="ip-include-cash" style="margin:0">รวมเงินสดในพอร์ตเข้าไปด้วย</label>
+            </div>
+            <div class="button-group">
+                <button type="button" class="btn-light" id="ip-close-btn">ยกเลิก</button>
+                <button type="button" class="btn-primary" id="ip-save-btn">บันทึกและอัปเดต</button>
+            </div>
         </div>
     </div>
 
@@ -1341,6 +1377,13 @@
         const assetType = document.getElementById('update-asset-type').value;
         const newTotalValue = parseFloat(document.getElementById('new-total-value').value);
         if (isNaN(newTotalValue) || newTotalValue < 0) { alert('กรุณากรอกมูลค่าที่ถูกต้อง'); return; }
+        const firstError = await applyTypeTotal(assetType, newTotalValue);
+        if (firstError) { alert('เกิดข้อผิดพลาด: ' + firstError.message); }
+        else { updateValueModalContainer.classList.add('hidden'); await fetchAllInvestments(); }
+    };
+
+    /* กระจายมูลค่ารวมใหม่ของประเภทหนึ่งให้แต่ละรายการตามสัดส่วนต้นทุนที่เหลือ (ใช้ทั้งกรอกเอง และอัปเดตจาก InvestPui) */
+    const applyTypeTotal = async (assetType, newTotalValue) => {
         const investmentsForType = allInvestments.filter(inv => inv.asset_type === assetType && remainingCost(inv) > 0.00001);
         const totalRemainingCost = investmentsForType.reduce((sum, inv) => sum + remainingCost(inv), 0);
         let updatePromises;
@@ -1352,11 +1395,97 @@
                 const newCurrentValue = rem > 0 ? targetRemainingValue * (orig / rem) : 0;
                 return db.from('investments').update({ current_value: newCurrentValue }).eq('id', inv.id);
             });
-        } else { return; }
+        } else { return { message: 'ประเภทนี้ยังไม่มีรายการลงทุนที่ถืออยู่' }; }
         const results = await Promise.all(updatePromises);
-        const firstError = results.find(res => res.error)?.error;
-        if (firstError) { alert('เกิดข้อผิดพลาด: ' + firstError.message); } 
-        else { updateValueModalContainer.classList.add('hidden'); await fetchAllInvestments(); }
+        return results.find(res => res.error)?.error || null;
+    };
+
+    /* ── เชื่อม InvestPui: ดึงมูลค่าพอร์ต (ราคาสด, บาท) มาอัปเดตมูลค่าปัจจุบันของแต่ละประเภท ── */
+    const IP_KEY = 'investpuiLink:v1';
+    const IP_DEFAULT_URL = 'https://stock-invest-eight.vercel.app';
+    const ipLoad = () => { try { return JSON.parse(localStorage.getItem(IP_KEY) || 'null') || {}; } catch { return {}; } };
+    const ipSave = (cfg) => { try { localStorage.setItem(IP_KEY, JSON.stringify(cfg)); } catch { /* ignore */ } };
+    let ipLastSummary = null;
+    const ipStatus = (html) => { const el = document.getElementById('ip-status'); if (el) el.innerHTML = html; };
+    const ipFetchSummary = async (url) => {
+        const res = await fetch(`${(url || IP_DEFAULT_URL).replace(/\/+$/, '')}/api/portfolio-summary`, { cache: 'no-store' });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(json.error || `HTTP ${res.status}`);
+        return json;
+    };
+    /* ค่าเริ่มต้น: พอร์ตดอลลาร์ → หุ้นต่างประเทศ · พอร์ตกองทุน (บาท) → กองทุนรวม (ถ้ามีประเภทนั้น) */
+    const ipDefaultMap = (summary) => {
+        const types = allAssetTypes.map(t => t.name);
+        const pick = (name) => types.includes(name) ? name : '';
+        return Object.fromEntries((summary.portfolios || []).map(p => [p.id, p.cur === 'THB' ? pick('กองทุนรวม') : pick('หุ้นต่างประเทศ')]));
+    };
+    const ipSync = async (manual = false) => {
+        const cfg = ipLoad();
+        if (!manual && cfg.disabled) return;
+        if (!manual && cfg.lastSync && Date.now() - cfg.lastSync < 10 * 60000) { ipShowLast(cfg); return; }
+        ipStatus('🔗 InvestPui · กำลังดึงมูลค่าพอร์ต…');
+        try {
+            const summary = await ipFetchSummary(cfg.url);
+            ipLastSummary = summary;
+            const map = cfg.map || ipDefaultMap(summary);
+            const totals = {};
+            for (const p of summary.portfolios || []) {
+                const type = map[p.id];
+                if (!type || p.investedThb == null) continue;
+                totals[type] = (totals[type] || 0) + p.investedThb + (cfg.includeCash ? (p.cashThb || 0) : 0);
+            }
+            const missing = (summary.portfolios || []).filter(p => map[p.id]).flatMap(p => p.missing || []);
+            const changed = [], skipped = [];
+            for (const [type, total] of Object.entries(totals)) {
+                const current = allInvestments.filter(inv => inv.asset_type === type && remainingCost(inv) > 0.00001).reduce((s, inv) => s + remainingValue(inv), 0);
+                if (Math.abs(current - total) < 0.5) continue;
+                const err = await applyTypeTotal(type, total);
+                if (err) skipped.push(`${type}: ${err.message}`); else changed.push(`${type} ฿${formatMoney(total)}`);
+            }
+            const next = { ...cfg, map, lastSync: Date.now(), lastText: changed.length ? changed.join(' · ') : 'มูลค่าตรงกับพอร์ตแล้ว' };
+            ipSave(next);
+            if (changed.length) await fetchAllInvestments();
+            ipShowLast(next, skipped.concat(missing.length ? [`ไม่พบราคา: ${missing.join(', ')}`] : []));
+        } catch (e) {
+            ipStatus(`🔗 InvestPui · <span class="ip-err">อัปเดตไม่สำเร็จ (${escapeHtml(e.message)})</span>`);
+        }
+    };
+    const ipShowLast = (cfg, warn = []) => {
+        if (!cfg.lastSync) { ipStatus('🔗 InvestPui · ยังไม่ได้อัปเดต'); return; }
+        const t = new Date(cfg.lastSync).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        ipStatus(`🔗 InvestPui · อัปเดต ${t} · <b>${escapeHtml(cfg.lastText || '')}</b>${warn.length ? ` · <span class="ip-err">${escapeHtml(warn.join(' · '))}</span>` : ''}`);
+    };
+    const ipRenderMap = (summary, cfg) => {
+        const map = cfg.map || ipDefaultMap(summary);
+        const opts = (sel) => ['<option value="">ไม่ใช้</option>', ...allAssetTypes.filter(t => t.name !== CASH_ASSET_TYPE).map(t => `<option value="${escapeHtml(t.name)}"${t.name === sel ? ' selected' : ''}>${escapeHtml(t.name)}</option>`)].join('');
+        document.getElementById('ip-map').innerHTML = (summary.portfolios || []).map(p => `
+            <div class="ip-map-row">
+                <div>${escapeHtml(p.name)}<small>${p.cur === 'THB' ? 'กองทุนรวม' : 'หุ้น (USD)'} · ฿${formatMoney(p.investedThb || 0)}${p.cashThb ? ` + เงินสด ฿${formatMoney(p.cashThb)}` : ''}</small></div>
+                <select data-pf="${escapeHtml(p.id)}">${opts(map[p.id] || '')}</select>
+            </div>`).join('') || '<p class="form-info">ไม่พบพอร์ต</p>';
+    };
+    const ipOpenSettings = async () => {
+        const cfg = ipLoad();
+        document.getElementById('ip-url').value = cfg.url || IP_DEFAULT_URL;
+        document.getElementById('ip-include-cash').checked = !!cfg.includeCash;
+        document.getElementById('ip-modal-container').classList.remove('hidden');
+        try {
+            const summary = ipLastSummary || await ipFetchSummary(cfg.url);
+            ipLastSummary = summary;
+            ipRenderMap(summary, cfg);
+        } catch (e) {
+            document.getElementById('ip-map').innerHTML = `<p class="ip-err">โหลดรายชื่อพอร์ตไม่ได้: ${escapeHtml(e.message)}</p>`;
+        }
+    };
+    const ipSaveSettings = async () => {
+        const map = {};
+        document.querySelectorAll('#ip-map select[data-pf]').forEach(sel => { map[sel.dataset.pf] = sel.value; });
+        const url = document.getElementById('ip-url').value.trim() || IP_DEFAULT_URL;
+        const prev = ipLoad();
+        if (url !== (prev.url || IP_DEFAULT_URL)) ipLastSummary = null;
+        ipSave({ ...prev, url, map: Object.keys(map).length ? map : prev.map, includeCash: document.getElementById('ip-include-cash').checked, lastSync: 0 });
+        document.getElementById('ip-modal-container').classList.add('hidden');
+        await ipSync(true);
     };
 
     const setView = (view) => {
@@ -1677,11 +1806,16 @@
             await fetchAllInvestments();
             await ensureDefaultAssetTypes();
             setupFilters(); renderUI(); 
+            ipSync();
         } else { authContainer.classList.remove('hidden'); appContainer.classList.add('hidden'); }
         loadRetirementDataFromLocalStorage();
     };
     db.auth.onAuthStateChange((event, session) => { if (event === 'SIGNED_IN') initializeApp(); else if (event === 'SIGNED_OUT') location.reload(); });
     document.getElementById('login-form').addEventListener('submit', handleLogin);
+    document.getElementById('ip-sync-btn').addEventListener('click', () => ipSync(true));
+    document.getElementById('ip-settings-btn').addEventListener('click', ipOpenSettings);
+    document.getElementById('ip-close-btn').addEventListener('click', () => document.getElementById('ip-modal-container').classList.add('hidden'));
+    document.getElementById('ip-save-btn').addEventListener('click', ipSaveSettings);
     document.getElementById('logout-btn').addEventListener('click', handleLogout);
     document.getElementById('investment-form').addEventListener('submit', addInvestment);
     document.getElementById('update-value-form').addEventListener('submit', handleBulkUpdateValue);
