@@ -7,7 +7,7 @@
     
     <!-- === ส่วนที่เพิ่มสำหรับปักหมุด (PWA) === -->
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#005B96">
+    <meta name="theme-color" content="#0F7A43">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="icon" type="image/svg+xml" href="logo.svg">
@@ -22,18 +22,18 @@
         @import url('https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;700&display=swap');
 
         :root {
-            --primary-color: #005B96; 
-            --secondary-color: #6497B1;
-            --background-color: #F0F4F8;
+            --primary-color: #0F7A43; 
+            --secondary-color: #5FA882;
+            --background-color: #F1F7F3;
             --card-bg-color: #FFFFFF;
             --text-color-dark: #212529;
             --text-color-light: #F8F9FA;
             --danger-color: #D9534F; 
             --success-color: #5CB85C;
-            --border-color: #DEE2E6;
-            --primary-hover-color: #004a7a;
+            --border-color: #DCE8E0;
+            --primary-hover-color: #0B6236;
             --danger-hover-color: #c9302c;
-            --secondary-hover-color: #507a8f;
+            --secondary-hover-color: #4A8B6A;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -85,8 +85,8 @@
         button.btn-danger:hover { background-color: var(--danger-hover-color); }
         button.btn-secondary { background-color: var(--secondary-color); color: white; }
         button.btn-secondary:hover { background-color: var(--secondary-hover-color); }
-        button.btn-light { background-color: #eef2ff; color: var(--primary-color); border: 1px solid var(--primary-color); }
-        button.btn-light:hover { background-color: #e0e7ff; }
+        button.btn-light { background-color: #ecf8f1; color: var(--primary-color); border: 1px solid var(--primary-color); }
+        button.btn-light:hover { background-color: #d9f1e3; }
 
         /* --- Main App Styling --- */
         /* หัวเว็บ: พื้นไล่สี + วงกลมตกแต่ง + โลโก้ในวงกลม */
@@ -94,9 +94,9 @@
             position: relative; overflow: hidden; isolation: isolate;
             display: flex; flex-direction: column; align-items: center; gap: 6px;
             text-align: center; margin-bottom: 30px;
-            background: linear-gradient(135deg, #0A7BC8 0%, var(--primary-color) 55%, #003E66 100%);
+            background: linear-gradient(135deg, #2DB872 0%, var(--primary-color) 55%, #0A5530 100%);
             padding: 30px 20px 26px; border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0, 59, 102, 0.25);
+            box-shadow: 0 10px 30px rgba(10, 85, 48, 0.25);
             color: var(--text-color-light);
         }
         header::before, header::after {
@@ -124,7 +124,7 @@
         }
         #logout-btn:hover { background: #E74C3C; border-color: #E74C3C; }
         .auth-brand { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 18px; }
-        .auth-brand img { width: 88px; height: 88px; border-radius: 50%; box-shadow: 0 8px 22px rgba(0, 59, 102, 0.25); }
+        .auth-brand img { width: 88px; height: 88px; border-radius: 50%; box-shadow: 0 8px 22px rgba(10, 85, 48, 0.25); }
         .auth-brand span { font-family: 'Kanit', sans-serif; font-weight: 700; font-size: 1.8rem; color: var(--primary-color); }
 
         .section {
@@ -146,7 +146,7 @@
             font-family: inherit; font-size: 1rem; transition: border-color 0.2s, box-shadow 0.2s;
         }
         .form-group input:focus, .form-group select:focus {
-            outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(0, 91, 150, 0.1);
+            outline: none; border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(15, 122, 67, 0.15);
         }
         #investment-form button[type="submit"] { width: 100%; }
         
@@ -201,9 +201,9 @@
         
         /* Summary Accordion Styles */
         #summary-table .summary-row { cursor: pointer; transition: background-color 0.2s ease; }
-        #summary-table .summary-row:hover { background-color: #f5f8fa; }
+        #summary-table .summary-row:hover { background-color: #f3f8f5; }
         #summary-table .details-row td { padding: 0; }
-        #summary-table .details-content { padding: 15px; background-color: #fafcff; }
+        #summary-table .details-content { padding: 15px; background-color: #f8fcfa; }
         #summary-table .investment-item {
             display: flex; justify-content: space-between; align-items: center;
             padding: 10px; border-bottom: 1px solid #e9ecef;
@@ -286,12 +286,12 @@
         #retirement-view .button-group { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 25px; }
         #retirement-view button { font-size: 1.1rem; }
         #retirement-view .results {
-            margin-top: 30px; padding: 20px; background-color: #eef2ff;
-            border: 2px solid #c7d2fe; border-radius: 8px;
+            margin-top: 30px; padding: 20px; background-color: #ecf8f1;
+            border: 2px solid #b7e3c9; border-radius: 8px;
         }
         #retirement-view .results h2 { margin-top: 0; color: var(--primary-color); text-align: center; }
         #retirement-view .results p { font-size: 1.1rem; line-height: 1.6; margin: 10px 0; }
-        #retirement-view .results span { font-weight: bold; color: #1d4ed8; }
+        #retirement-view .results span { font-weight: bold; color: #0F7A43; }
         #retirement-view .error { color: var(--danger-color); text-align: center; margin-top: 15px; min-height: 1.2em; }
         #retirement-view .yearly-projection { margin-top: 25px; }
         #retirement-view .yearly-projection h3 { color: var(--primary-color); }
@@ -312,8 +312,8 @@
         #retirement-view .yearly-projection details { margin: 8px 0 12px; font-size: 0.85rem; color: #4b5563; }
         #retirement-view .yearly-projection summary { cursor: pointer; }
         #retirement-yearly-table th, #retirement-yearly-table td { border-bottom: 1px solid #dee2e6; }
-        #retirement-yearly-table .retirement-milestone { background: #dbeafe; font-weight: 600; }
-        #retirement-yearly-table td:last-child { color: #1d4ed8; font-weight: 600; }
+        #retirement-yearly-table .retirement-milestone { background: #d9f1e3; font-weight: 600; }
+        #retirement-yearly-table td:last-child { color: #0F7A43; font-weight: 600; }
         
         /* --- MOBILE RESPONSIVE STYLES --- */
         @media (max-width: 768px) {
