@@ -53,10 +53,10 @@
         .hidden { display: none !important; }
         /* เชื่อม InvestPui */
         /* แถบอัปเดตจาก InvestPui: บรรทัดเดียว กระชับ */
-        .ip-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: -10px 0 20px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--card-bg-color); font-size: .85rem; color: #4b5563; }
+        .ip-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: -10px 0 20px; padding: 8px 10px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--card-bg-color); font-size: .85rem; color: #4b5563; }
         .ip-logo { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #ecf8f1; color: var(--primary-color); font-size: 1rem; }
         .ip-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-        .ip-line { display: flex; align-items: baseline; gap: 6px; font-size: .78rem; color: #6C757D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ip-line { display: flex; align-items: baseline; gap: 6px; font-size: .85rem; color: #6C757D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ip-line b { color: var(--text-color-dark); font-size: .85rem; font-weight: 600; }
         .ip-chips { display: flex; flex-wrap: wrap; gap: 4px 6px; }
         .ip-chip { display: inline-flex; gap: 5px; align-items: baseline; padding: 2px 8px; border-radius: 999px; background: #ecf8f1; color: #374151; font-size: .78rem; white-space: nowrap; }
@@ -1505,8 +1505,7 @@
         const d = new Date(cfg.lastSync);
         const today = new Date().toDateString() === d.toDateString();
         const t = today ? d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-        const chips = Object.entries(cfg.lastTotals || {}).map(([type, v]) => `<span class="ip-chip">${escapeHtml(type)} <b>฿${Number(v).toLocaleString('th-TH', { maximumFractionDigits: 0 })}</b></span>`).join('');
-        ipStatus(`<span class="ip-line"><b>InvestPui</b> อัปเดต ${t}</span>${chips ? `<div class="ip-chips">${chips}</div>` : ''}${warn.length ? `<span class="ip-err">${escapeHtml(warn.join(' · '))}</span>` : ''}`);
+        ipStatus(`<span class="ip-line"><b>InvestPui</b> อัปเดตล่าสุด ${t}</span>${warn.length ? `<span class="ip-err">${escapeHtml(warn.join(' · '))}</span>` : ''}`);
     };
     const ipRenderMap = (summary, cfg) => {
         const map = cfg.map || ipDefaultMap(summary);
