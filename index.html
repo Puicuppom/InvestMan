@@ -10,7 +10,9 @@
     <meta name="theme-color" content="#005B96">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/3459/3459372.png">
+    <link rel="icon" type="image/svg+xml" href="logo.svg">
+    <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-180.png">
     <!-- =================================== -->
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -87,16 +89,43 @@
         button.btn-light:hover { background-color: #e0e7ff; }
 
         /* --- Main App Styling --- */
-        header { 
-            text-align: center; margin-bottom: 30px; background: var(--primary-color);
-            padding: 25px 20px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        /* หัวเว็บ: พื้นไล่สี + วงกลมตกแต่ง + โลโก้ในวงกลม */
+        header {
+            position: relative; overflow: hidden; isolation: isolate;
+            display: flex; flex-direction: column; align-items: center; gap: 6px;
+            text-align: center; margin-bottom: 30px;
+            background: linear-gradient(135deg, #0A7BC8 0%, var(--primary-color) 55%, #003E66 100%);
+            padding: 30px 20px 26px; border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 59, 102, 0.25);
             color: var(--text-color-light);
         }
-        header h1 { font-weight: 700; font-size: 2.5rem; margin-bottom: 8px; }
-        header p#user-email-display { font-size: 1rem; word-break: break-all; opacity: 0.9; }
-        #logout-btn { 
-             margin-top: 15px; padding: 10px 25px;
+        header::before, header::after {
+            content: ""; position: absolute; z-index: -1; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.08);
         }
+        header::before { width: 260px; height: 260px; top: -120px; right: -70px; }
+        header::after { width: 180px; height: 180px; bottom: -90px; left: -50px; background: rgba(255, 255, 255, 0.06); }
+        .brand-logo {
+            width: 84px; height: 84px; border-radius: 50%;
+            padding: 6px; background: rgba(255, 255, 255, 0.18);
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18), inset 0 0 0 2px rgba(255, 255, 255, 0.35);
+            margin-bottom: 4px;
+        }
+        .brand-logo img { display: block; width: 100%; height: 100%; border-radius: 50%; }
+        header h1 { font-weight: 700; font-size: 2.3rem; line-height: 1.2; margin: 0; letter-spacing: .5px; }
+        header p#user-email-display {
+            font-size: .9rem; word-break: break-all; opacity: 0.95; margin: 2px 0 0;
+            padding: 3px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.14);
+        }
+        #logout-btn {
+            margin-top: 12px; padding: 8px 22px; border-radius: 999px;
+            background: rgba(255, 255, 255, 0.12); color: #fff; border: 1px solid rgba(255, 255, 255, 0.45);
+            font-size: .95rem;
+        }
+        #logout-btn:hover { background: #E74C3C; border-color: #E74C3C; }
+        .auth-brand { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 18px; }
+        .auth-brand img { width: 88px; height: 88px; border-radius: 50%; box-shadow: 0 8px 22px rgba(0, 59, 102, 0.25); }
+        .auth-brand span { font-family: 'Kanit', sans-serif; font-weight: 700; font-size: 1.8rem; color: var(--primary-color); }
 
         .section {
             background: var(--card-bg-color); padding: 25px; border-radius: 8px;
@@ -385,6 +414,7 @@
     <div class="container">
         <!-- AUTH CONTAINER -->
         <div id="auth-container">
+            <div class="auth-brand"><img src="logo.svg" alt="" width="88" height="88"><span>ลงทุนแมน</span></div>
             <div class="section">
                 <h2 class="section-title">เข้าสู่ระบบ</h2>
                 <form id="login-form">
@@ -398,6 +428,7 @@
         <!-- MAIN APP CONTAINER -->
         <div id="app-container" class="hidden">
             <header>
+                <div class="brand-logo"><img src="logo.svg" alt="" width="72" height="72"></div>
                 <h1>ลงทุนแมน</h1>
                 <p id="user-email-display"></p>
                 <button id="logout-btn" class="btn-danger">ออกจากระบบ</button>
