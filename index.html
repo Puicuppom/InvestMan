@@ -52,11 +52,21 @@
         }
         .hidden { display: none !important; }
         /* เชื่อม InvestPui */
-        .ip-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: -10px 0 20px; padding: 10px 14px; border: 1px solid var(--border-color); border-radius: 8px; background: var(--card-bg-color); font-size: .9rem; color: #495057; }
-        .ip-bar .ip-status { flex: 1; min-width: 180px; }
-        .ip-bar .ip-status b { color: var(--primary-color); }
-        .ip-bar .ip-err { color: var(--danger-color); }
-        .ip-bar button { padding: 6px 14px; font-size: .9rem; }
+        /* แถบอัปเดตจาก InvestPui: บรรทัดเดียว กระชับ */
+        .ip-bar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 10px; margin: -10px 0 20px; padding: 10px 12px; border: 1px solid var(--border-color); border-radius: 14px; background: var(--card-bg-color); font-size: .85rem; color: #4b5563; }
+        .ip-logo { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #ecf8f1; color: var(--primary-color); font-size: 1rem; }
+        .ip-main { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+        .ip-line { display: flex; align-items: baseline; gap: 6px; font-size: .78rem; color: #6C757D; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ip-line b { color: var(--text-color-dark); font-size: .85rem; font-weight: 600; }
+        .ip-chips { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+        .ip-chip { display: inline-flex; gap: 5px; align-items: baseline; padding: 2px 8px; border-radius: 999px; background: #ecf8f1; color: #374151; font-size: .78rem; white-space: nowrap; }
+        .ip-chip b { color: var(--primary-color); font-weight: 600; font-variant-numeric: tabular-nums; }
+        .ip-err { color: var(--danger-color); font-size: .78rem; }
+        .ip-actions { display: flex; gap: 6px; }
+        .ip-bar .ip-icon { width: 34px; height: 34px; padding: 0; border-radius: 50%; display: grid; place-items: center; font-size: 1rem; line-height: 1; background: #ecf8f1; color: var(--primary-color); border: 1px solid transparent; box-shadow: none; }
+        .ip-bar .ip-icon:hover { background: #d9f1e3; }
+        .ip-bar .ip-icon.spin span { display: inline-block; animation: ipspin .8s linear infinite; }
+        @keyframes ipspin { to { transform: rotate(360deg); } }
         .ip-map { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
         .ip-map-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; align-items: center; }
         .ip-map-row small { display: block; color: #6C757D; font-size: .8rem; }
@@ -177,6 +187,9 @@
             border-radius: 0; box-shadow: none;
         }
         .view-toggle-btn.active { background-color: var(--primary-color); color: white; font-weight: 600; }
+        .slide-left { animation: slideL .25s ease; } .slide-right { animation: slideR .25s ease; }
+        @keyframes slideL { from { opacity: .3; transform: translateX(28px); } to { opacity: 1; transform: none; } }
+        @keyframes slideR { from { opacity: .3; transform: translateX(-28px); } to { opacity: 1; transform: none; } }
         
         .table-container {
             width: 100%;
@@ -441,9 +454,12 @@
             </div>
 
             <div class="ip-bar" id="ip-bar">
-                <span class="ip-status" id="ip-status">🔗 InvestPui · ยังไม่ได้อัปเดต</span>
-                <button type="button" class="btn-small btn-primary" id="ip-sync-btn">อัปเดตจากพอร์ต</button>
-                <button type="button" class="btn-small btn-light" id="ip-settings-btn">ตั้งค่า</button>
+                <span class="ip-logo" aria-hidden="true">🔗</span>
+                <div class="ip-main" id="ip-status"><span class="ip-line"><b>InvestPui</b> ยังไม่ได้อัปเดต</span></div>
+                <div class="ip-actions">
+                    <button type="button" class="ip-icon" id="ip-sync-btn" title="อัปเดตจากพอร์ต" aria-label="อัปเดตจากพอร์ต"><span>↻</span></button>
+                    <button type="button" class="ip-icon" id="ip-settings-btn" title="ตั้งค่าการเชื่อม" aria-label="ตั้งค่าการเชื่อม"><span>⚙</span></button>
+                </div>
             </div>
 
             <div class="view-toggle">
@@ -1454,7 +1470,8 @@
         const cfg = ipLoad();
         if (!manual && cfg.disabled) return;
         if (!manual && cfg.lastSync && Date.now() - cfg.lastSync < 10 * 60000) { ipShowLast(cfg); return; }
-        ipStatus('🔗 InvestPui · กำลังดึงมูลค่าพอร์ต…');
+        ipStatus('<span class="ip-line"><b>InvestPui</b> กำลังดึงมูลค่าพอร์ต…</span>');
+        document.getElementById('ip-sync-btn')?.classList.add('spin');
         try {
             const summary = await ipFetchSummary(cfg.url);
             ipLastSummary = summary;
@@ -1473,18 +1490,23 @@
                 const err = await applyTypeTotal(type, total);
                 if (err) skipped.push(`${type}: ${err.message}`); else changed.push(`${type} ฿${formatMoney(total)}`);
             }
-            const next = { ...cfg, map, lastSync: Date.now(), lastText: changed.length ? changed.join(' · ') : 'มูลค่าตรงกับพอร์ตแล้ว' };
+            const next = { ...cfg, map, lastSync: Date.now(), lastTotals: totals, lastChanged: changed.length, lastText: changed.length ? changed.join(' · ') : 'มูลค่าตรงกับพอร์ตแล้ว' };
             ipSave(next);
             if (changed.length) await fetchAllInvestments();
             ipShowLast(next, skipped.concat(missing.length ? [`ไม่พบราคา: ${missing.join(', ')}`] : []));
         } catch (e) {
-            ipStatus(`🔗 InvestPui · <span class="ip-err">อัปเดตไม่สำเร็จ (${escapeHtml(e.message)})</span>`);
+            document.getElementById('ip-sync-btn')?.classList.remove('spin');
+            ipStatus(`<span class="ip-line"><b>InvestPui</b></span><span class="ip-err">อัปเดตไม่สำเร็จ · ${escapeHtml(e.message)}</span>`);
         }
     };
     const ipShowLast = (cfg, warn = []) => {
-        if (!cfg.lastSync) { ipStatus('🔗 InvestPui · ยังไม่ได้อัปเดต'); return; }
-        const t = new Date(cfg.lastSync).toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-        ipStatus(`🔗 InvestPui · อัปเดต ${t} · <b>${escapeHtml(cfg.lastText || '')}</b>${warn.length ? ` · <span class="ip-err">${escapeHtml(warn.join(' · '))}</span>` : ''}`);
+        document.getElementById('ip-sync-btn')?.classList.remove('spin');
+        if (!cfg.lastSync) { ipStatus('<span class="ip-line"><b>InvestPui</b> ยังไม่ได้อัปเดต</span>'); return; }
+        const d = new Date(cfg.lastSync);
+        const today = new Date().toDateString() === d.toDateString();
+        const t = today ? d.toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : d.toLocaleString('th-TH', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        const chips = Object.entries(cfg.lastTotals || {}).map(([type, v]) => `<span class="ip-chip">${escapeHtml(type)} <b>฿${Number(v).toLocaleString('th-TH', { maximumFractionDigits: 0 })}</b></span>`).join('');
+        ipStatus(`<span class="ip-line"><b>InvestPui</b> อัปเดต ${t}</span>${chips ? `<div class="ip-chips">${chips}</div>` : ''}${warn.length ? `<span class="ip-err">${escapeHtml(warn.join(' · '))}</span>` : ''}`);
     };
     const ipRenderMap = (summary, cfg) => {
         const map = cfg.map || ipDefaultMap(summary);
@@ -1519,8 +1541,45 @@
         await ipSync(true);
     };
 
-    const setView = (view) => {
+    /* ปัดซ้าย/ขวาบนเนื้อหาเพื่อเปลี่ยนแท็บ (มือถือ) */
+    const VIEW_ORDER = ['summary', 'analysis', 'retirement'];
+    (() => {
+        const app = document.getElementById('app-container');
+        if (!app) return;
+        let st = null;
+        const scrollsX = el => {
+            for (let n = el; n && n !== app; n = n.parentElement) {
+                if (n.scrollWidth > n.clientWidth + 2 && /(auto|scroll)/.test(getComputedStyle(n).overflowX)) return true;
+            }
+            return false;
+        };
+        app.addEventListener('touchstart', e => {
+            if (e.touches.length !== 1) { st = null; return; }
+            const t = e.target;
+            if (t.closest('input, select, textarea, button, .modal-container, header, .ip-bar') || scrollsX(t)) { st = null; return; }
+            st = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+        }, { passive: true });
+        app.addEventListener('touchend', e => {
+            if (!st) return;
+            const dx = e.changedTouches[0].clientX - st.x, dy = e.changedTouches[0].clientY - st.y;
+            const quick = Date.now() - st.t < 700;
+            st = null;
+            if (!quick || Math.abs(dx) < 70 || Math.abs(dx) < Math.abs(dy) * 1.6) return;
+            const i = VIEW_ORDER.indexOf(currentView);
+            const next = VIEW_ORDER[i + (dx < 0 ? 1 : -1)];
+            if (next) setView(next, dx < 0 ? 'left' : 'right');
+        }, { passive: true });
+    })();
+
+    const setView = (view, dir) => {
         currentView = view;
+        const viewEl = { summary: summaryView, analysis: analysisView, retirement: retirementView }[view];
+        if (dir && viewEl) {
+            viewEl.classList.remove('slide-left', 'slide-right');
+            void viewEl.offsetWidth;
+            viewEl.classList.add(dir === 'left' ? 'slide-left' : 'slide-right');
+            document.querySelector('.view-toggle')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+        }
         document.querySelectorAll('.view-toggle-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelector(`.view-toggle-btn[onclick="setView('${view}')"]`).classList.add('active');
         summaryView.classList.toggle('hidden', view !== 'summary');
