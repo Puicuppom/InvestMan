@@ -1,7 +1,7 @@
 // แบบเดียวกับ PuiHome&Tax: โหลดจากเน็ตก่อน (อัปเดตเห็นทันที) ถ้าออฟไลน์ใช้ของที่เก็บไว้
 // ไม่เก็บคำขอ Supabase
-const CACHE = 'investman-v2';
-const ASSETS = ['./', './index.html', './manifest.json', './logo.svg', './icon-192.png', './icon-512.png'];
+const CACHE = 'investman-v3';
+const ASSETS = ['./', './index.html', './manifest.json?v=3', './logo.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
