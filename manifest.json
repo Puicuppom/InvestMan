@@ -1,7 +1,7 @@
 {
   "name": "ลงทุนแมน - วางแผนการเงิน",
   "short_name": "ลงทุนแมน",
-  "start_url": "index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#F1F7F3",
   "theme_color": "#0F7A43",
