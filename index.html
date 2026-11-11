@@ -116,13 +116,13 @@
         header::before { width: 260px; height: 260px; top: -120px; right: -70px; }
         header::after { width: 180px; height: 180px; bottom: -90px; left: -50px; background: rgba(255, 255, 255, 0.06); }
         .brand-logo {
-            width: 84px; height: 84px; border-radius: 50%;
-            padding: 6px; background: rgba(255, 255, 255, 0.18);
+            width: 132px; height: 132px; border-radius: 50%;
+            padding: 5px; background: rgba(255, 255, 255, 0.18);
             box-shadow: 0 6px 18px rgba(0, 0, 0, 0.18), inset 0 0 0 2px rgba(255, 255, 255, 0.35);
             margin-bottom: 4px;
         }
         .brand-logo img { display: block; width: 100%; height: 100%; border-radius: 50%; }
-        header h1 { font-weight: 700; font-size: 2.3rem; line-height: 1.2; margin: 0; letter-spacing: .5px; }
+        header h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; font-weight: 700; font-size: 2.3rem; line-height: 1.2; margin: 0; letter-spacing: .5px; }
         header p#user-email-display {
             font-size: .9rem; word-break: break-all; opacity: 0.95; margin: 2px 0 0;
             padding: 3px 12px; border-radius: 999px; background: rgba(255, 255, 255, 0.14);
@@ -134,7 +134,7 @@
         }
         #logout-btn:hover { background: #E74C3C; border-color: #E74C3C; }
         .auth-brand { display: flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 18px; }
-        .auth-brand img { width: 88px; height: 88px; border-radius: 50%; box-shadow: 0 8px 22px rgba(10, 85, 48, 0.25); }
+        .auth-brand img { width: 148px; height: 148px; border-radius: 50%; box-shadow: 0 8px 22px rgba(10, 85, 48, 0.25); }
         .auth-brand span { font-family: 'Kanit', sans-serif; font-weight: 700; font-size: 1.8rem; color: var(--primary-color); }
 
         .section {
@@ -427,7 +427,7 @@
     <div class="container">
         <!-- AUTH CONTAINER -->
         <div id="auth-container">
-            <div class="auth-brand"><img src="logo.svg" alt="" width="88" height="88"><span>ลงทุนแมน</span></div>
+            <div class="auth-brand"><img src="logo.svg" alt="ลงทุนแมน" width="148" height="148"></div>
             <div class="section">
                 <h2 class="section-title">เข้าสู่ระบบ</h2>
                 <form id="login-form">
@@ -441,7 +441,7 @@
         <!-- MAIN APP CONTAINER -->
         <div id="app-container" class="hidden">
             <header>
-                <div class="brand-logo"><img src="logo.svg" alt="" width="72" height="72"></div>
+                <div class="brand-logo"><img src="logo.svg" alt="ลงทุนแมน" width="122" height="122"></div>
                 <h1>ลงทุนแมน</h1>
                 <p id="user-email-display"></p>
                 <button id="logout-btn" class="btn-danger">ออกจากระบบ</button>
