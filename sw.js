@@ -1,9 +1,23 @@
-// ให้เบราว์เซอร์ถือว่าเป็นแอปที่ติดตั้งได้ (ต้องมีตัวรับ fetch)
-// แต่ไม่ยุ่งกับการเปิดหน้าเว็บ — การเปิดหน้าที่ผ่านตัวนี้แล้วเจอ redirect ทำให้เปิดแอปไม่ได้
-self.addEventListener('install', () => self.skipWaiting());
-self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
-self.addEventListener('fetch', (e) => {
-  if (e.request.mode === 'navigate' || e.request.method !== 'GET') return;
-  if (new URL(e.request.url).origin !== self.location.origin) return;
-  e.respondWith(fetch(e.request));
+// แบบเดียวกับ PuiHome&Tax: โหลดจากเน็ตก่อน (อัปเดตเห็นทันที) ถ้าออฟไลน์ใช้ของที่เก็บไว้
+// ไม่เก็บคำขอ Supabase
+const CACHE = 'investman-v2';
+const ASSETS = ['./', './index.html', './manifest.json', './logo.svg', './icon-192.png', './icon-512.png'];
+
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)).then(() => self.skipWaiting()));
+});
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+});
+self.addEventListener('fetch', e => {
+  const req = e.request;
+  if (req.method !== 'GET' || req.url.includes('.supabase.co')) return;
+  e.respondWith(
+    fetch(req).then(res => {
+      if (res.ok && req.url.startsWith(self.location.origin)) {
+        const copy = res.clone(); caches.open(CACHE).then(c => c.put(req, copy));
+      }
+      return res;
+    }).catch(() => caches.match(req).then(r => r || caches.match('./index.html')))
+  );
 });
